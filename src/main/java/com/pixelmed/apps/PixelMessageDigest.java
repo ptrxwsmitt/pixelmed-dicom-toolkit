@@ -9,6 +9,7 @@ import com.pixelmed.display.SourceImage;
 
 import com.pixelmed.slf4j.Logger;
 import com.pixelmed.slf4j.LoggerFactory;
+import com.pixelmed.utils.HexDump;
 
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
@@ -18,8 +19,6 @@ import java.io.IOException;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-
-import javax.xml.bind.DatatypeConverter;	// for getting digest as hex string
 
 /**
  * <p>A class for computing message digests of pixel data, decompressed if compressed.</p>
@@ -53,7 +52,7 @@ public class PixelMessageDigest {
 	public PixelMessageDigest(String inputfilename) throws DicomException, IOException, NoSuchAlgorithmException {
 		byte[] digest = computePixelMessageDigestFromFrames(new File(inputfilename));
 		if (digest != null) {
-			slf4jlogger.info("Digest={}",DatatypeConverter.printHexBinary(digest).toLowerCase());		// https://www.baeldung.com/java-md5
+			slf4jlogger.info("Digest={}", HexDump.byteArrayToHexString(digest).toLowerCase());		// https://www.baeldung.com/java-md5
 		}
 	}
 

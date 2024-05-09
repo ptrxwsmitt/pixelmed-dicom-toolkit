@@ -8,7 +8,14 @@ This is an initial personal attempt of turning the Pixelmed DICOM Toolkit from D
 The origin of the code can be found here, which is under the BSD Licence:
 https://www.pixelmed.com/dicomtoolkit.html
 
+## Work Done
 
+- Moved all bash and shell scripts into 'scripts' folder
+- Moved all java code into standard java folder structure (src/main/java)
+- Moved tests into standard java folder structure (src/test/java)
+- Moved Webstart to src/main/webstart
+- Removed Duplicate classes
+- Added most dependecies or possible replacements into [pom.xml](pom.xml)
 
 ## Roadmap
 

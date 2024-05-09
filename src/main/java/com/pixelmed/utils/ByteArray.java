@@ -16,6 +16,8 @@ public class ByteArray {
 	private static final String identString = "@(#) $Header: /userland/cvs/pixelmed/imgbook/com/pixelmed/utils/ByteArray.java,v 1.23 2022/01/21 19:51:31 dclunie Exp $";
 
 	private ByteArray() {}
+
+
 	
 	public static final byte[] readFully(String filename) throws IOException {
 		byte[] b = null;

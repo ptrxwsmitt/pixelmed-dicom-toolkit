@@ -2,29 +2,9 @@
 
 package com.pixelmed.apps;
 
-import com.pixelmed.dicom.Attribute;
-import com.pixelmed.dicom.AttributeFactory;
-import com.pixelmed.dicom.AttributeList;
-import com.pixelmed.dicom.AttributeTag;
-import com.pixelmed.dicom.ClinicalTrialsAttributes;
-import com.pixelmed.dicom.CodedSequenceItem;
-import com.pixelmed.dicom.CodingSchemeIdentification;
-import com.pixelmed.dicom.DateTimeAttribute;
-import com.pixelmed.dicom.DicomDictionary;
-import com.pixelmed.dicom.DicomException;
-import com.pixelmed.dicom.DicomInputStream;
-import com.pixelmed.dicom.FileMetaInformation;
-import com.pixelmed.dicom.FunctionalGroupUtilities;
-import com.pixelmed.dicom.LongStringAttribute;
-import com.pixelmed.dicom.MediaImporter;
-import com.pixelmed.dicom.MoveDicomFilesIntoHierarchy;
-import com.pixelmed.dicom.SequenceAttribute;
-import com.pixelmed.dicom.SequenceItem;
-import com.pixelmed.dicom.TagFromName;
-import com.pixelmed.dicom.TransferSyntax;
-import com.pixelmed.dicom.UnknownAttribute;
-import com.pixelmed.dicom.VersionAndConstants;
-
+import com.pixelmed.dicom.*;
+import com.pixelmed.slf4j.Logger;
+import com.pixelmed.slf4j.LoggerFactory;
 import com.pixelmed.utils.MessageLogger;
 import com.pixelmed.utils.PrintStreamMessageLogger;
 
@@ -32,23 +12,10 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-
-import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-
-import javax.json.Json;
-import javax.json.JsonArray;
-import javax.json.JsonObject;
-import javax.json.JsonReader;
-import javax.json.JsonString;
-import javax.json.JsonValue;
-
-import com.pixelmed.slf4j.Logger;
-import com.pixelmed.slf4j.LoggerFactory;
 
 /**
  * <p>A class containing an application for adding or replacing top level and shared multi-frame functional group attributes from a JSON summary description.</p>

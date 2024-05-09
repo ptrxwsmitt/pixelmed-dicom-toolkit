@@ -2,58 +2,23 @@
 
 package com.pixelmed.apps;
 
-import com.pixelmed.dicom.Attribute;
-import com.pixelmed.dicom.AttributeList;
-import com.pixelmed.dicom.ClinicalTrialsAttributes;
-import com.pixelmed.dicom.CodedSequenceItem;
-import com.pixelmed.dicom.CodeStringAttribute;
-import com.pixelmed.dicom.CompressedFrameDecoder;
-import com.pixelmed.dicom.DicomException;
-import com.pixelmed.dicom.DicomInputStream;
-import com.pixelmed.dicom.FileMetaInformation;
-import com.pixelmed.dicom.MediaImporter;
-import com.pixelmed.dicom.OtherByteAttributeMultipleCompressedFrames;
-import com.pixelmed.dicom.OtherByteAttributeCompressedSeparateFramesOnDisk;
-import com.pixelmed.dicom.SequenceAttribute;
-import com.pixelmed.dicom.SequenceItem;
-import com.pixelmed.dicom.SOPClass;
-import com.pixelmed.dicom.TagFromName;
-import com.pixelmed.dicom.TransferSyntax;
-import com.pixelmed.dicom.VersionAndConstants;
-
+import com.pixelmed.dicom.*;
 import com.pixelmed.display.ImageEditUtilities;
 import com.pixelmed.display.SourceImage;
-
-import com.pixelmed.network.PresentationContextListFactory;
-
+import com.pixelmed.slf4j.Logger;
+import com.pixelmed.slf4j.LoggerFactory;
 import com.pixelmed.utils.CapabilitiesAvailable;
 import com.pixelmed.utils.MessageLogger;
 import com.pixelmed.utils.PrintStreamMessageLogger;
 
-import java.awt.Shape;
-import java.awt.Rectangle;
-
+import java.awt.*;
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-import java.util.Vector;
-
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import javax.imageio.ImageIO;
-
-import com.pixelmed.slf4j.Logger;
-import com.pixelmed.slf4j.LoggerFactory;
 
 /**
  * <p>A class to implement bulk de-identification and redaction of DICOM files.</p>
@@ -129,11 +94,10 @@ public class DeidentifyAndRedact {
 			this.replacementAttributes = replacementAttributes;
 			this.failedSet = failedSet;
 		}
-		
 		/**
 		 * <p>Deidentify both the DICOM Attributes and the Pixel Data using the RedactionRegions specified in the constructor.</p>
 		 *
-		 * <p>Implements the following options of {@link ClinicalTrialsAttributes#removeOrNullIdentifyingAttributes(AttributeList,int,boolean,boolean,boolean,boolean,boolean,boolean,int,Date,Date) ClinicalTrialsAttributes.removeOrNullIdentifyingAttributes()}:</p>
+		 * <p>Implements the following options of {@link ClinicalTrialsAttributes#removeOrNullIdentifyingAttributes(AttributeList, int, boolean, boolean)} (AttributeList,int,boolean,boolean,boolean,boolean,boolean,boolean,int,Date,Date) ClinicalTrialsAttributes.removeOrNullIdentifyingAttributes()}:</p>
 		 * <p>keepDescriptors, keepSeriesDescriptors, keepProtocolName, keepPatientCharacteristics, keepDeviceIdentity, keepInstitutionIdentity, ClinicalTrialsAttributes.HandleDates.keep</p>
 		 *
 		 * <p>Also performs {@link AttributeList#removeUnsafePrivateAttributes() AttributeList.removeUnsafePrivateAttributes()}</p>

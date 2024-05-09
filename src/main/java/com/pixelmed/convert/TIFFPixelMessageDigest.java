@@ -5,34 +5,18 @@ package com.pixelmed.convert;
 import com.pixelmed.dicom.CompressedFrameDecoder;
 import com.pixelmed.dicom.DicomException;
 import com.pixelmed.dicom.TransferSyntax;
-
-import java.awt.color.ColorSpace;
-import java.awt.image.DataBufferByte;
-import java.awt.image.BufferedImage;
-
-//import java.io.BufferedInputStream;
-//import java.io.BufferedReader;
-import java.io.File;
-//import java.io.FileInputStream;
-//import java.io.FileOutputStream;
-//import java.io.InputStream;
-import java.io.IOException;
-
-//import java.nio.ByteOrder;
-
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-
-import java.util.ArrayList;
-//import java.util.Arrays;
-//import java.util.Collections;
-//import java.util.Iterator;
-//import java.util.List;
-
-import javax.xml.bind.DatatypeConverter;	// for getting digest as hex string
-
 import com.pixelmed.slf4j.Logger;
 import com.pixelmed.slf4j.LoggerFactory;
+import com.pixelmed.utils.HexDump;
+
+import javax.xml.bind.DatatypeConverter;
+import java.awt.color.ColorSpace;
+import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
+import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 
 /**
  * <p>A class for computing message digests of pixel data, decompressed if compressed, from TIFF files.</p>
@@ -275,7 +259,7 @@ public class TIFFPixelMessageDigest {
 				slf4jlogger.error("Failed to compute Message Digest: ",e);
 			}
 			if (digest != null) {
-				slf4jlogger.info("Digest={}",DatatypeConverter.printHexBinary(digest).toLowerCase());		// https://www.baeldung.com/java-md5
+				slf4jlogger.info("Digest={}", HexDump.byteArrayToHexString(digest).toLowerCase());		// https://www.baeldung.com/java-md5
 			}
 			else {
 				slf4jlogger.error("Failed to compute Message Digest");

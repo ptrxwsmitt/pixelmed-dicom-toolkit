@@ -2,60 +2,16 @@
 
 package com.pixelmed.display;
 
-import com.pixelmed.dicom.Attribute;
-import com.pixelmed.dicom.AttributeList;
-import com.pixelmed.dicom.BinaryOutputStream;
-import com.pixelmed.dicom.CodeStringAttribute;
-import com.pixelmed.dicom.DicomException;
-import com.pixelmed.dicom.DicomInputStream;
-import com.pixelmed.dicom.DicomOutputStream;
-import com.pixelmed.dicom.FileMetaInformation;
-import com.pixelmed.dicom.IntegerStringAttribute;
-import com.pixelmed.dicom.OtherByteAttribute;
-import com.pixelmed.dicom.OtherByteAttributeCompressedSeparateFramesOnDisk;
-import com.pixelmed.dicom.OtherByteAttributeMultipleCompressedFrames;
-import com.pixelmed.dicom.OtherByteAttributeMultipleFilesOnDisk;
-import com.pixelmed.dicom.OtherByteAttributeMultipleFrameArrays;
-import com.pixelmed.dicom.OtherByteAttributeOnDisk;
-import com.pixelmed.dicom.OtherWordAttribute;
-import com.pixelmed.dicom.OtherWordAttributeMultipleFilesOnDisk;
-import com.pixelmed.dicom.OtherWordAttributeMultipleFrameArrays;
-import com.pixelmed.dicom.OtherWordAttributeOnDisk;
-import com.pixelmed.dicom.Overlay;
-import com.pixelmed.dicom.TagFromName;
-import com.pixelmed.dicom.TransferSyntax;
-import com.pixelmed.dicom.UnsignedShortAttribute;
-
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.Rectangle;
-import java.awt.Shape;
-
-import java.awt.geom.Rectangle2D;
-import java.awt.geom.RectangularShape;
-
-import java.awt.image.BufferedImage;
-import java.awt.image.ComponentSampleModel;
-import java.awt.image.DataBuffer;
-import java.awt.image.DataBufferByte;
-import java.awt.image.DataBufferShort;
-import java.awt.image.DataBufferUShort;
-import java.awt.image.Raster;
-import java.awt.image.SampleModel;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-
-import java.util.Iterator;
-import java.util.Vector;
-
+import com.pixelmed.dicom.*;
 import com.pixelmed.slf4j.Logger;
 import com.pixelmed.slf4j.LoggerFactory;
+
+import java.awt.*;
+import java.awt.geom.RectangularShape;
+import java.awt.image.*;
+import java.io.*;
+import java.util.Iterator;
+import java.util.Vector;
 
 /**
  * <p>A class of utility methods for editing image pixel data.</p>

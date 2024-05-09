@@ -2,38 +2,15 @@
 
 package com.pixelmed.apps;
 
-import com.pixelmed.convert.IndexedLabelMapToSegmentation;
-
-import com.pixelmed.dicom.Attribute;
-import com.pixelmed.dicom.AttributeList;
-import com.pixelmed.dicom.DicomDictionary;
-import com.pixelmed.dicom.DicomException;
-import com.pixelmed.dicom.DicomInputStream;
-import com.pixelmed.dicom.FileMetaInformation;
-import com.pixelmed.dicom.OtherByteAttribute;
-import com.pixelmed.dicom.SequenceAttribute;
-import com.pixelmed.dicom.SOPClass;
-import com.pixelmed.dicom.TagFromName;
-import com.pixelmed.dicom.TransferSyntax;
-import com.pixelmed.dicom.UnsignedShortAttribute;
-
+import com.pixelmed.dicom.*;
 import com.pixelmed.geometry.GeometryOfSlice;
+import com.pixelmed.slf4j.Logger;
+import com.pixelmed.slf4j.LoggerFactory;
 
 import java.io.BufferedInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-
-//import java.awt.*;
-//import java.awt.color.*;
-
-import java.awt.image.BufferedImage;
-import java.awt.image.ColorModel;
-
-import java.util.Vector;
-
-import com.pixelmed.slf4j.Logger;
-import com.pixelmed.slf4j.LoggerFactory;
 
 /**
  * <p>A class of static methods to read DICOM segmentation images, and shrink their extent to the minimum bounding box surrounding the segments.</p>
