@@ -1,0 +1,437 @@
+/* Copyright (c) 2001-2014, David A. Clunie DBA Pixelmed Publishing. All rights reserved. */
+
+package com.pixelmed.apps;
+
+import com.pixelmed.database.DatabaseApplicationProperties;
+import com.pixelmed.database.DatabaseInformationModel;
+import com.pixelmed.database.MinimalPatientStudySeriesInstanceModel;
+
+import com.pixelmed.dicom.Attribute;
+import com.pixelmed.dicom.AttributeList;
+import com.pixelmed.dicom.AttributeTag;
+import com.pixelmed.dicom.DicomException;
+import com.pixelmed.dicom.DicomInputStream;
+import com.pixelmed.dicom.FileMetaInformation;
+import com.pixelmed.dicom.InformationEntity;
+import com.pixelmed.dicom.MoveDicomFilesIntoHierarchy;
+import com.pixelmed.dicom.StoredFilePathStrategy;
+import com.pixelmed.dicom.TagFromName;
+
+import com.pixelmed.network.AnyExplicitStorePresentationContextSelectionPolicy;
+import com.pixelmed.network.DicomNetworkException;
+import com.pixelmed.network.NetworkApplicationInformation;
+import com.pixelmed.network.NetworkApplicationInformationFederated;
+import com.pixelmed.network.NetworkApplicationProperties;
+import com.pixelmed.network.ReceivedObjectHandler;
+import com.pixelmed.network.StorageSOPClassSCPDispatcher;
+
+import com.pixelmed.utils.FileUtilities;
+
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
+import java.io.IOException;
+
+//import java.text.SimpleDateFormat;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.StringTokenizer;
+
+/**
+ * <p>A class to wait for incoming composite instance storage operations and process when study is complete based on time since last instance received.</p>
+ *
+ * <p>The class has no public methods other than the constructor and a main method that is useful as a utility.</p>
+ *
+ * <p>External (unsecure) SQL access to the database is possible if the Application.DatabaseServerName property is specified; further
+ * details are described in {@link com.pixelmed.database.DatabaseInformationModel com.pixelmed.database.DatabaseInformationModel}; for example:</p>
+ * <pre>
+% java -cp lib/additional/hsqldb.jar org.hsqldb.util.DatabaseManagerSwing --url "jdbc:hsqldb:hsql://localhost/testserverdb"
+ * </pre>
+ *
+ * <p>For how to configure the necessary properties file, see:</p>
+ *
+ * @see com.pixelmed.network.NetworkApplicationProperties
+ * @see com.pixelmed.database.DatabaseApplicationProperties
+ *
+ * @author	dclunie
+ */
+public class StudyReceiver {
+
+	private static final String identString = "@(#) $Header: /userland/cvs/pixelmed/imgbook/com/pixelmed/apps/StudyReceiver.java,v 1.3 2014/09/09 20:34:09 dclunie Exp $";
+	
+	protected static String defaultPropertiesFileName = ".com.pixelmed.apps.StudyReceiver.properties";
+	
+	protected static String propertyName_CompletedStudiesFolderName									  = "Application.CompletedStudiesFolderName";
+	protected static String propertyName_SleepTimeBetweenPassesToProcessReceivedFiles                 = "Application.SleepTimeBetweenPassesToProcessReceivedFiles";
+	protected static String propertyName_IntervalAfterLastInstanceReceivedToWaitBeforeProcessingStudy = "Application.IntervalAfterLastInstanceReceivedToWaitBeforeProcessingStudy";
+	protected static String propertyName_ApplicationDebugLevel                                        = "Application.DebugLevel";
+	
+	protected String defaultCompletedStudiesFolderName									 = ".com.pixelmed.apps.StudyReceiver.completedstudies";
+	protected String defaultSleepTimeBetweenPassesToProcessReceivedFiles                 = "60";	// 1 minute
+	protected String defaultIntervalAfterLastInstanceReceivedToWaitBeforeProcessingStudy = "60";	// 1 minute
+	
+	protected static int sleepTimeBetweenPassesToProcessReceivedFiles;					// seconds
+	protected static int intervalAfterLastInstanceReceivedToWaitBeforeProcessingStudy;	// seconds
+		
+	protected Properties properties;
+	
+	protected NetworkApplicationProperties networkApplicationProperties;
+	protected NetworkApplicationInformationFederated networkApplicationInformation;
+	
+	protected String ourCalledAETitle;
+	
+	protected DatabaseInformationModel databaseInformationModel;
+		
+	protected int applicationDebugLevel;
+
+	protected String buildDate = getBuildDate();
+	
+	protected File completedStudiesFolder;
+	
+	protected File savedImagesFolder;
+	protected StoredFilePathStrategy storedFilePathStrategy = StoredFilePathStrategy.BYSOPINSTANCEUIDHASHSUBFOLDERS;
+	
+	protected String studyHasBeenProcessedColumnName          = "PM_STUDYHASBEENPROCESSED";			// needs to be upper case ... indicates that all instances were successfully processed and study is not to be processed again
+	protected String studyMostRecentInsertionTimeColumnName   = "PM_STUDYMOSTRECENTINSERTIONTIME";	// needs to be upper case ... timestamp of insertion of most recently received instance for the study
+
+
+	protected String instanceHasBeenProcessedColumnName		  = "PM_INSTANCEHASBEENPROCESSED";	// needs to be upper case ... indicates that instance was successfully processed
+	
+	protected String studyInstanceUIDColumnName;
+	protected String sopClassUIDColumnName;
+	protected String instanceLocalFileNameColumnName;
+	protected String instanceLocalFileReferenceTypeColumnName;
+	protected String instanceLocalPrimaryKeyColumnName;
+	protected String seriesLocalPrimaryKeyColumnName;
+
+
+	/**
+	 * <p>Get the date the package was built.</p>
+	 *
+	 * @return	 the build date
+	 */
+	// copied from ApplicationFrame - should refactor :(
+	protected String getBuildDate() {
+		String buildDate = "";
+		try {
+			buildDate = (new BufferedReader(new InputStreamReader(StudyReceiver.class.getResourceAsStream("/BUILDDATE")))).readLine();
+		}
+		catch (IOException e) {
+			e.printStackTrace(System.err);
+		}
+		return buildDate;
+	}
+
+	/**
+	 * <p>Load properties.</p>
+	 *
+	 * @throws	IOException	thrown if properties file is missing
+	 */
+	protected void loadProperties(String propertiesFileName) throws IOException {
+		properties = new Properties(/*defaultProperties*/);
+		FileInputStream in = new FileInputStream(propertiesFileName);
+		properties.load(in);
+		in.close();
+	}
+	
+	// copied from SynchronizeFromRemoteSCP ... should refactor :(
+	protected static class OurReadTerminationStrategy implements AttributeList.ReadTerminationStrategy {
+		public boolean terminate(AttributeList attributeList,AttributeTag tag,long byteOffset) {
+			return tag.getGroup() > 0x0020;
+		}
+	}
+	
+	protected final static AttributeList.ReadTerminationStrategy terminateAfterRelationshipGroup = new OurReadTerminationStrategy();
+
+	protected boolean processStudy(String studyLocalPrimaryKeyValue) throws DicomException, IOException, Exception {
+		boolean processed = false;
+		List<Map<String,String>> seriesInstances = databaseInformationModel.findAllAttributeValuesForAllRecordsForThisInformationEntityWithSpecifiedParent(InformationEntity.SERIES,studyLocalPrimaryKeyValue);
+		for (Map<String,String> series : seriesInstances) {
+			String seriesLocalPrimaryKeyValue = series.get(seriesLocalPrimaryKeyColumnName);
+			List<Map<String,String>> instances = databaseInformationModel.findAllAttributeValuesForAllRecordsForThisInformationEntityWithSpecifiedParent(InformationEntity.INSTANCE,seriesLocalPrimaryKeyValue);
+			for (Map<String,String> instance : instances) {
+				String fileName = instance.get(instanceLocalFileNameColumnName);
+System.err.println("processStudy(): processing fileName "+fileName);
+					FileInputStream fis = new FileInputStream(fileName);
+					DicomInputStream i = new DicomInputStream(new BufferedInputStream(fis));
+					AttributeList list = new AttributeList();
+					list.read(i,terminateAfterRelationshipGroup);
+					i.close();
+					fis.close();
+				String newFileName = MoveDicomFilesIntoHierarchy.renameFileWithHierarchicalPathFromAttributes(new File(fileName),list,completedStudiesFolder.getCanonicalPath(),"Duplicates");
+System.err.println("processStudy(): moved fileName "+fileName+" to "+newFileName);
+				if (newFileName != null) {
+					String instanceLocalPrimaryKeyValue = instance.get(instanceLocalPrimaryKeyColumnName);
+					databaseInformationModel.updateSelectedRecord(InformationEntity.INSTANCE,instanceLocalPrimaryKeyValue,instanceLocalFileNameColumnName,newFileName);
+				}
+			}
+			processed = true;
+		}
+
+		return processed;
+	}
+	
+	protected boolean processStudyIfComplete(String studyLocalPrimaryKeyValue) throws DicomException, IOException, Exception {
+		boolean processed = false;
+		long mostRecentInsertionTime = Long.parseLong(databaseInformationModel.findSelectedAttributeValuesForSelectedRecord(InformationEntity.STUDY,studyLocalPrimaryKeyValue,studyMostRecentInsertionTimeColumnName));
+		
+		long currentTimeMillis = System.currentTimeMillis();
+if (applicationDebugLevel > 2) System.err.println("StudyReceiver.processStudyIfComplete(): currentTimeMillis = "+currentTimeMillis);
+if (applicationDebugLevel > 2) System.err.println("StudyReceiver.processStudyIfComplete(): mostRecentInsertionTime = "+mostRecentInsertionTime);
+		long secondsSinceMostRecentInsertion = (currentTimeMillis - mostRecentInsertionTime) / 1000;
+if (applicationDebugLevel > 1) System.err.println("StudyReceiver.processStudyIfComplete(): secondsSinceMostRecentInsertion = "+secondsSinceMostRecentInsertion);
+		if (secondsSinceMostRecentInsertion > intervalAfterLastInstanceReceivedToWaitBeforeProcessingStudy) {
+if (applicationDebugLevel > 0) System.err.println("StudyReceiver.processStudyIfComplete(): processing, since old enough");
+			processed = processStudy(studyLocalPrimaryKeyValue);
+		}
+		else {
+if (applicationDebugLevel > 0) System.err.println("StudyReceiver.processStudyIfComplete(): not processing, since too recent");
+		}
+		
+		return processed;
+	}
+
+	protected class WatchDatabaseAndProcessCompleteStudies implements Runnable {
+		public void run() {
+			boolean interrupted = false;
+			while (!interrupted) {
+if (applicationDebugLevel > 1) System.err.println("StudyReceiver.WatchDatabaseAndProcessCompleteStudies.run(): Starting or waking up WatchDatabaseAndProcessCompleteStudies ...");
+				try {
+					List<Map<String,String>> returnedRecords = databaseInformationModel.findAllAttributeValuesForAllRecordsForThisInformationEntity(InformationEntity.STUDY);
+					{
+						for (Map<String,String> record : returnedRecords) {
+							if (applicationDebugLevel > 2) {
+								System.err.println("STUDY:");
+								for (String key : record.keySet()) {
+									System.err.println("\t"+key+" = "+record.get(key));
+								}
+							}
+							String studyLocalPrimaryKeyValue = record.get(databaseInformationModel.getLocalPrimaryKeyColumnName(InformationEntity.STUDY));
+							String studyHasBeenProcessedValue = record.get(studyHasBeenProcessedColumnName);
+							boolean studyHasBeenProcessed = studyHasBeenProcessedValue != null && studyHasBeenProcessedValue.toUpperCase(java.util.Locale.US).equals("TRUE");
+							if (studyHasBeenProcessed) {
+if (applicationDebugLevel > 1) System.err.println("StudyReceiver.WatchDatabaseAndProcessCompleteStudies.run(): Already processed "+record.get(studyInstanceUIDColumnName));
+							}
+							else {
+if (applicationDebugLevel > 0) System.err.println("StudyReceiver.WatchDatabaseAndProcessCompleteStudies.run(): Considering "+record.get(studyInstanceUIDColumnName));
+								try {
+									if(processStudyIfComplete(studyLocalPrimaryKeyValue)) {
+										// returned true (success) only if ALL selected files in complete study were successfully processed
+										databaseInformationModel.updateSelectedRecord(InformationEntity.STUDY,studyLocalPrimaryKeyValue,studyHasBeenProcessedColumnName,"TRUE");										
+									}
+								}
+								catch (Exception e) {
+									e.printStackTrace(System.err);
+									// do not set study processed to true, since failure may be transient and can try again next time
+								}
+							}
+						}
+					}
+					
+
+if (applicationDebugLevel > 1) System.err.println("StudyReceiver.WatchDatabaseAndProcessCompleteStudies.run(): sleeping for "+sleepTimeBetweenPassesToProcessReceivedFiles+" seconds");
+					Thread.currentThread().sleep(sleepTimeBetweenPassesToProcessReceivedFiles*1000);	// configured value is in seconds, sleep() parameter is in milliseconds
+				}
+				catch (DicomException e) {
+					e.printStackTrace(System.err);
+				}
+				catch (InterruptedException e) {
+if (applicationDebugLevel > 1) System.err.println("StudyReceiver.WatchDatabaseAndProcessCompleteStudies.run(): interrupted: "+e);
+					interrupted = true;		// currently this shouldn't happen; i.e., no other thread will interrupt this one whilst sleeping (?)
+				}
+			}
+		}
+	}
+	
+	protected void updateStudyMostRecentInsertionTime(String studyInstanceUID,long insertionTime) throws DicomException {
+if (applicationDebugLevel > 1) System.err.println("StudyReceiver.updateStudyMostRecentInsertionTime(): studyInstanceUID = "+studyInstanceUID+", time = "+insertionTime);
+		ArrayList<Map<String,String>> studies = databaseInformationModel.findAllAttributeValuesForAllRecordsForThisInformationEntityWithSpecifiedKeyValue(InformationEntity.STUDY,studyInstanceUIDColumnName,studyInstanceUID);
+		if (studies.size() == 1) {
+			Map<String,String> study = studies.get(0);
+			String studyLocalPrimaryKeyValue = study.get(databaseInformationModel.getLocalPrimaryKeyColumnName(InformationEntity.STUDY));
+			databaseInformationModel.updateSelectedRecord(InformationEntity.STUDY,studyLocalPrimaryKeyValue,studyMostRecentInsertionTimeColumnName,Long.toString(insertionTime));
+		}
+		else {
+			throw new DicomException("Internal error: missing or multiple study table records for StudyInstanceUID"+studyInstanceUID);
+		}
+	}
+	
+	protected class ReceivedFileProcessor implements Runnable {
+		String receivedFileName;
+		AttributeList list;
+		
+		ReceivedFileProcessor(String receivedFileName) {
+			this.receivedFileName = receivedFileName;
+		}
+		
+		public void run() {
+			try {
+if (applicationDebugLevel > 1) System.err.println("StudyReceiver.ReceivedFileProcessor.run(): receivedFileName = "+receivedFileName);
+				FileInputStream fis = new FileInputStream(receivedFileName);
+				DicomInputStream i = new DicomInputStream(new BufferedInputStream(fis));
+				AttributeList list = new AttributeList();
+				list.read(i,terminateAfterRelationshipGroup);
+				i.close();
+				fis.close();
+				
+				String studyInstanceUID = Attribute.getSingleStringValueOrEmptyString(list,TagFromName.StudyInstanceUID);
+				if (studyInstanceUID.length() > 0) {
+					databaseInformationModel.insertObject(list,receivedFileName,DatabaseInformationModel.FILE_COPIED);
+					updateStudyMostRecentInsertionTime(studyInstanceUID,System.currentTimeMillis());
+					
+				}
+				else {
+					throw new DicomException("No StudyInstanceUID in received file "+receivedFileName);
+					// should probably delete it :(
+				}
+			}
+			catch (Exception e) {
+				e.printStackTrace(System.err);
+			}
+		}
+	}
+	
+	/**
+	 *
+	 */
+	protected class OurReceivedObjectHandler extends ReceivedObjectHandler {
+		/**
+		 * @param	dicomFileName
+		 * @param	transferSyntax
+		 * @param	callingAETitle
+		 * @throws	IOException
+		 * @throws	DicomException
+		 * @throws	DicomNetworkException
+		 */
+		public void sendReceivedObjectIndication(String dicomFileName,String transferSyntax,String callingAETitle)
+				throws DicomNetworkException, DicomException, IOException {
+			if (dicomFileName != null) {
+if (applicationDebugLevel > 0) System.err.println("Received: "+dicomFileName+" from "+callingAETitle+" in "+transferSyntax);
+				try {
+					new Thread(new ReceivedFileProcessor(dicomFileName)).start();		// on separate thread, else will block and the C-STORE response will be delayed
+				} catch (Exception e) {
+					e.printStackTrace(System.err);
+				}
+			}
+
+		}
+	}
+	
+	protected class OurPatientStudySeriesInstanceModel extends MinimalPatientStudySeriesInstanceModel {
+		OurPatientStudySeriesInstanceModel(String databaseFileName,String databaseServerName) throws DicomException {
+			super(databaseFileName,databaseServerName);
+		}
+
+		protected void extendCreateStatementStringWithUserColumns(StringBuffer b,InformationEntity ie) {
+			if (ie == InformationEntity.STUDY) {
+				b.append(", "); b.append(studyHasBeenProcessedColumnName); b.append(" "); b.append("BOOLEAN");
+				b.append(", "); b.append(studyMostRecentInsertionTimeColumnName); b.append(" "); b.append("BIGINT");	// see "http://www.hsqldb.org/doc/guide/ch09.html#datatypes-section"
+			}
+			else if (ie == InformationEntity.INSTANCE) {
+				b.append(", "); b.append(instanceHasBeenProcessedColumnName); b.append(" "); b.append("BOOLEAN");
+			}
+		}
+
+	}
+
+	// copied from DatabaseApplicationProperties.getSavedImagesFolderCreatingItIfNecessary()
+	/**
+	 * <p>Return the folder, creating it if necessary.</p>
+	 *
+	 * <p>If not an absolute path, will be sought or created relative to the current user's home directory.</p>
+	 *
+	 * @return	the folder
+	 */
+	protected File getCompletedStudiesFolderNameCreatingItIfNecessary(String completedStudiesFolderName) throws IOException {
+//System.err.println("DatabaseApplicationProperties.getSavedImagesFolderCreatingItIfNecessary(): requesting completedStudiesFolderName = "+completedStudiesFolderName);
+		File completedStudiesFolder = new File(completedStudiesFolderName);
+		if (completedStudiesFolder.isAbsolute()) {
+			if (!completedStudiesFolder.isDirectory() && !completedStudiesFolder.mkdirs()) {
+				throw new IOException("Cannot find or create absolute path "+completedStudiesFolder);
+			}
+		}
+		else {
+			completedStudiesFolder = new File(FileUtilities.makePathToFileInUsersHomeDirectory(completedStudiesFolderName));
+			if (!completedStudiesFolder.isDirectory() && !completedStudiesFolder.mkdirs()) {
+				throw new IOException("Cannot find or create home directory relative path "+completedStudiesFolder);
+			}
+		}
+//System.err.println("Study.Receiver.getCompletedStudiesFolderNameCreatingItIfNecessary(): using completedStudiesFolder = "+completedStudiesFolder);
+		return completedStudiesFolder;
+	}
+	
+	/**
+	 * <p>Wait for incoming composite instance storage operations and process when study is complete based on time since last instance received.</p>
+	 *
+	 * @param	propertiesFileName
+	 */
+	public StudyReceiver(String propertiesFileName) throws DicomException, DicomNetworkException, IOException, InterruptedException {
+		loadProperties(propertiesFileName);		// do NOT trap exception; we must have properties
+
+		completedStudiesFolder = getCompletedStudiesFolderNameCreatingItIfNecessary(properties.getProperty(propertyName_CompletedStudiesFolderName,defaultCompletedStudiesFolderName));
+
+		applicationDebugLevel = Integer.valueOf(properties.getProperty(propertyName_ApplicationDebugLevel,"0")).intValue();
+
+		sleepTimeBetweenPassesToProcessReceivedFiles                 = Integer.valueOf(properties.getProperty(propertyName_SleepTimeBetweenPassesToProcessReceivedFiles,defaultSleepTimeBetweenPassesToProcessReceivedFiles)).intValue();
+		intervalAfterLastInstanceReceivedToWaitBeforeProcessingStudy = Integer.valueOf(properties.getProperty(propertyName_IntervalAfterLastInstanceReceivedToWaitBeforeProcessingStudy,defaultIntervalAfterLastInstanceReceivedToWaitBeforeProcessingStudy)).intValue();
+
+		DatabaseApplicationProperties databaseApplicationProperties = new DatabaseApplicationProperties(properties);
+		savedImagesFolder = databaseApplicationProperties.getSavedImagesFolderCreatingItIfNecessary();
+		databaseInformationModel = new OurPatientStudySeriesInstanceModel(databaseApplicationProperties.getDatabaseFileName(),databaseApplicationProperties.getDatabaseServerName());
+		
+		studyInstanceUIDColumnName               = databaseInformationModel.getDatabaseColumnNameFromDicomTag(TagFromName.StudyInstanceUID);
+		sopClassUIDColumnName                    = databaseInformationModel.getDatabaseColumnNameFromDicomTag(TagFromName.SOPClassUID);
+		instanceLocalFileNameColumnName          = databaseInformationModel.getLocalFileNameColumnName(InformationEntity.INSTANCE);
+		instanceLocalFileReferenceTypeColumnName = databaseInformationModel.getLocalFileReferenceTypeColumnName(InformationEntity.INSTANCE);
+		instanceLocalPrimaryKeyColumnName        = databaseInformationModel.getLocalPrimaryKeyColumnName(InformationEntity.INSTANCE);
+		seriesLocalPrimaryKeyColumnName          = databaseInformationModel.getLocalPrimaryKeyColumnName(InformationEntity.SERIES);
+		
+		networkApplicationProperties = new NetworkApplicationProperties(properties,true/*addPublicStorageSCPsIfNoRemoteAEsConfigured*/);
+		networkApplicationInformation = new NetworkApplicationInformationFederated();
+		networkApplicationInformation.startupAllKnownSourcesAndRegister(networkApplicationProperties);
+		ourCalledAETitle = networkApplicationProperties.getCalledAETitle();
+
+		// Start up DICOM association listener in background for receiving images and responding to echoes and queries and retrieves ...
+if (applicationDebugLevel > 1) System.err.println("Starting up DICOM association listener ...");
+		{
+			int port = networkApplicationProperties.getListeningPort();
+			int storageSCPDebugLevel = networkApplicationProperties.getStorageSCPDebugLevel();
+			int queryDebugLevel = networkApplicationProperties.getQueryDebugLevel();
+			new Thread(new StorageSOPClassSCPDispatcher(port,ourCalledAETitle,savedImagesFolder,storedFilePathStrategy,new OurReceivedObjectHandler(),
+					null/*queryResponseGeneratorFactory*/,
+					null/*etrieveResponseGeneratorFactory*/,
+					networkApplicationInformation,
+					new AnyExplicitStorePresentationContextSelectionPolicy(),
+					false/*secureTransport*/,
+					storageSCPDebugLevel)).start();
+		}
+		
+		new Thread(new WatchDatabaseAndProcessCompleteStudies()).start();
+	}
+
+	/**
+	 * <p>Wait for incoming composite instance storage operations and process when study is complete based on time since last instance received.</p>
+	 *
+	 * @param	arg		none
+	 */
+	public static void main(String arg[]) {
+		try {
+			String propertiesFileName = arg.length > 0 ? arg[0] : FileUtilities.makePathToFileInUsersHomeDirectory(defaultPropertiesFileName);
+			new StudyReceiver(propertiesFileName);
+		}
+		catch (Exception e) {
+			e.printStackTrace(System.err);
+			System.exit(0);
+		}
+	}
+}
+

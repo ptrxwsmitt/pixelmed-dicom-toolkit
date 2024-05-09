@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?><definesrttosctmappingtable xmlns="http://www.pixelmed.com/namespaces/srttosctmapping">
+	<mapping sct="349358000" srt="F-61FDB"/>	<!-- inactive, replacement per PS3.16 -->
+	<mapping sct="47975008"  srt="T-53131"/>	<!-- inactive, replacement per PS3.16 -->
+	<mapping sct="714645007" srt="T-F6078"/>	<!-- exact, not in DICOM subset or Annex O, "Entire Gland" -->
+	<mapping sct="279706003" srt="T-D05E4"/>	<!-- exact, not in DICOM subset or Annex O, "Peripheral zone of the prostate"-->
+	<mapping sct="113343008" srt="T-1A310"/>	<!-- replacement active "Entire gland (organ) (body structure)" used as "Organ" with active "Body organ structure (body structure)" (which is also in Annex O from T-D0060) (don't want "entire") -->
+	<mapping sct="255503000" srt="R-404A4"/>	<!-- exact, not in DICOM subset or Annex O, "Entire" -->
+	<mapping sct="55940004"  srt="T-00317"/>	<!-- invalid, use replacement for T-C5300 per PS3.16, "Pharyngeal Tonsil adenoid" -->
+	<mapping sct="370129005" srt="G-C306"/>		<!-- invalid, use replacement for G-C036 per PS3.16, "Measurement Method" -->
+</definesrttosctmappingtable>

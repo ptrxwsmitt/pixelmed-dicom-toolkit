@@ -1,0 +1,351 @@
+20231125. DAC.
+
+This is the PixelMed Publishing pure Java DICOM toolkit. All the
+class and supporting files are included in a single jar file,
+pixelmed.jar.
+
+Installation.
+
+A JRE of 1.7.0 or more recent is required.
+
+The following additional jar files from other freely available packages
+may be required, depending on which components of the toolkit are used.
+
+For your convenience, these are available packaged together in the
+"dependencies" file of the current release, to be used in combination
+with the "binaries" and/or "source" release file.
+
+The dependencies are:
+
+slf4j-api-1.7.22.jar
+slf4j-simple-1.7.22.jar
+
+		All logging of errors, warning, information, debugging and
+		tracing is now performed using the com.pixelmed.slf package,
+		which is a very thin wrapper around a subset of the SLF4J
+		facade classes and methods, rather than the previous approach
+		of sending everything directly to System.err (stderr). All
+		constructors and methods with "debugLevel" arguments have
+		been deprecated and all "debugLevel" command line arguments
+		have been removed.
+
+		slf4j-api-*.jar is required at compilation time, but may be
+		omitted at run time if no SLF implementation is used, and
+		com.pixelmed.slf will log to System.err.
+			
+		A logging implementation of some kind may be supplied at runtime;
+		the minimal approach is to supply slf4j-simple-*.jar, which
+		also sends everything to stderr.
+
+		The default log level for slf4j is INFO, but either the default
+		for all classes can be changed by adding:
+
+		  -Dorg.slf4j.simpleLogger.defaultLogLevel=debug
+
+		in the java command line invocation, or per class, e.g.,:
+
+		  -Dorg.slf4j.simpleLogger.log.com.pixelmed.doseocr.OCR=trace
+
+		Other options are useful for logging background processes, e.g.:
+
+		  -Dorg.slf4j.simpleLogger.showDateTime=true
+		  -Dorg.slf4j.simpleLogger.dateTimeFormat="EEE MMM dd HH:mm:ss zzz yyyy"
+		  -Dorg.slf4j.simpleLogger.dateTimeFormat="yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+
+		See:
+		  http://www.slf4j.org/
+		  http://www.slf4j.org/api/org/slf4j/impl/SimpleLogger.html
+		  https://github.com/qos-ch/slf4j/blob/master/slf4j-simple/src/test/resources/simplelogger.properties
+
+		Even if slf4j-api-*.jar and an slf implementation are not supplied
+		at runtime, a subset of the slf4j properties are still used (i.e.,
+		com.pixelmed.slf reuses the same properties as slf4j rather than
+		defining its own). Specifically, the following properties (only)
+		are supported by the com.pixelmed.slf implementation:
+
+		  org.slf4j.simpleLogger.defaultLogLevel (default logging detail level for all instances, default is info)
+		  org.slf4j.simpleLogger.log.xxxxx (logging detail level for a logger instance named "xxxxx")
+		  org.slf4j.simpleLogger.showDateTime (default is false)
+		  org.slf4j.simpleLogger.dateTimeFormat (default is ms since start)
+
+pixelmed_codec.jar
+
+		Required for compilation but currently only required at runtime
+		when selective redaction of baseline JPEG blocks is needed (e.g.,
+		when this feature of DicomCleaner or DicomImageBlackout or
+		DeidentifyAndRedact is needed).
+		
+		Available from the PixelMed software site at:
+		
+		"http://www.dclunie.com/pixelmed/software/codec/"
+
+junit-4.8.1.jar
+
+		Required for compilation but currently only required at runtime
+		for the tests related to the dose packages (doseocr and test);
+		however, future versions of the toolkit will likely make more
+		extensive use of junit for unit testing.
+
+hsqldb.jar
+
+		The HypersonicSQL database. The recommended version is
+		2.3.3 or later.
+		
+		See "http://hsqldb.org/".
+
+		Required at runtime for applications that use a database (such
+		as DicomImageViewer, DicomCleaner, DoseUtility and the various servers).
+		
+		Required for building from source.
+
+commons-compress-1.12.jar
+
+		A pure Java implementation of the bzip2 compression algorithm. Primarily
+		used to support a private PixelMed compression transfer syntax, if
+		available at runtime regardless. It is available from the Apache project:
+		
+		"http://commons.apache.org/proper/commons-compress/"
+
+		It was formerly part of the Apache Jakarta Avalon Excalibur project
+		as a component, was then folded into the Ant distribution, before
+		being migrated into the commons family, together with other codecs.
+
+		Required at runtime for applications that want to support bzip2
+		transfer syntaxes ... absence will be detected dynamically and
+		these transfer syntaxes will not be offered or accepted.
+		
+		Not required for building from source.
+		
+vecmath1.2-1.14.jar
+
+		The computation of geometric information (such as for posting localizers
+		and reporting 3D cursor positions) for cross-sectional images depends
+		on the Java 3D API, and since this isn't available for all platforms,
+		the code makes use of the routines in this free 3rd party implementation
+		of the vector math (only) parts of the 3D API written by Kenji Hiranabe:
+
+		"http://objectclub.esm.co.jp/vecmath/"
+		
+		The official Sun Java 3D implementation also works, if it is available
+		for your hardware platform.
+
+		Required at runtime for applications that want use 3D localization, such
+		as DicomImageViewer.
+		
+		Required for building from source unless Java3D installed.
+		
+commons-codec-1.3.jar
+
+		Contains encoding of person name using phonetic mechanisms such as Soundex
+		and Metaphone; used for person name matching in database queries. See:
+		
+		"http://jakarta.apache.org/commons/codec/"
+
+		Required at runtime for applications that want to support phonetic matching;
+		absense will result in trapped exceptions and default use of canonical as
+		phonetic name (i.e., the exceptions are harmless).
+		
+		Not required for building from source.
+		
+commons-net-ftp-2.0
+
+		Contains ftp and secure ftp clients.
+		
+		For use with IHE REM Dose Information Reporter transaction for transfer to
+		registry (which is via ftp over TLS (RFC 4217) rather than DICOM).
+
+jmdns.jar
+
+		Contains support for Multicast DNS (mDNS) and DNS Self Discovery (DNS-SD)
+		used for zeroconf network configuration (aka. Apple's Bonjour):
+		
+		"http://sourceforge.net/projects/jmdns/"
+		"http://jmdns.sourceforge.net/"
+		
+		Tested with version jmdns-3.4.1 from sourceforge unmodified (2.x versions
+		will no longer work, since some 3.x API changes and features are now used).
+
+		Required at runtime for all DICOM network applications that want to perform
+		self discovery ... absence will be detected dynamically and self discovery
+		will not be performed.
+		
+		Required for building from source.
+
+javax.json-1.0.4.jar
+javax.json-api-1.0.jar
+
+		Contains support for JSON parsing:
+		
+		"https://jsonp.java.net/"
+		"https://jsonp.java.net/download.html" and look for the "non-Maven" links
+		
+		javax.json-1.0.4.jar is required at runtime for com.pixelmed.app package
+		tools that use JSON files as input to describe DICOM attributes and
+		values
+		
+		javax.json-api-1.0.jar is required for building from source.
+
+opencsv-2.4.jar
+
+		Contains support for reading and writing CSV files:
+
+		"http://opencsv.sourceforge.net/"
+
+saxon-he-11.5.jar
+xmlresolver-4.6.4.jar
+
+		Contains support for XSLT for validating large DICOM SR files when they
+		exceed the limits of the Xalan implementation built in to the JRE.
+
+		Used in the supplied DicomSRValidator.sh script.
+
+		"https://github.com/Saxonica/Saxon-HE/blob/main/11/Java/SaxonHE11-5J.zip"
+
+jpedalSTD.jar
+
+		Contains support for reading and rendering PDF:
+		
+		"http://www.jpedal.org/"
+		
+		Tested with 2007/06/14 GPL version.
+		
+		Note that there are also commercial (non-GPL) versions that should work.
+		
+		Also, additional jar files are available from the JPedal site, including
+		the BouncyCastle cryptography provider (bcprov-jdk14-119.jar, which is open
+		source) and the jdom XML provider (jdom.jar, also open source); neither of
+		these appear to be necessary for decoding PDF files as used in the
+		pixelmed toolkit,given the faciities of contemporary JVMs.
+		
+		There is also at the JPedal site a jar file that is not open source but is
+		free for non-commercial use (only), which provides support for rendering of
+		embedded fonts (pjes.jar); this is not necessary for the function of the
+		tools, but may improve the quality of the rendering.
+
+		******** GPL Alert ********
+		
+		NB. JPedal is GPL - PixelMed is not - consider this with respect to using
+		and or distributing PixelMed-based source and/or binary code that depends
+		on the JPedal functionality - the only thing that will not work if JPedal
+		is not included is rendering of PDF (com.pixelmed.dicom.PDFToDicomImage)
+		
+		Not required for building from source (reflection is used to detect if
+		present at runtime when necessary).
+		
+		NOT INCLUDED IN PIXELMED DISTRIBUTION - DOWNLOAD IT YOURSELF AS REQUIRED.
+		
+AiViewer
+
+		Though not a dependency per se, the web server does support the use of
+		Takahiro Katoji's AiViewer open source GPL Java applet from Akira Iwata's
+		laboratory at the Nagoya Institute of Technology with the web server.
+		
+		It is available from "http://mars.elcom.nitech.ac.jp/dicom".
+		
+		To use it, make sure that the class files are in the "dicomviewer" folder
+		in the root of the web server folder (where the stylesheet is), as specified
+		in the web server properties. The DICOM dictionary is not necessary but can
+		be put in the same location. Then set the RequestTypeToUseForInstances
+		web server property to APPLETDISPLAY. Alternatively, include a jar file
+		in the classpath that contains the dicomviewer/*.class files.
+		
+		Alternatively, one could modify the AppletDisplayTemplate.tpl template to
+		directly get the class files from the Nagoya site, but then the local
+		java security policy file would need to be changed to allow the applet
+		to access images from a different server than that from which the class
+		files were obtained.
+			
+		Not required for building from source.
+		
+Java Image I/O
+
+		Support for reading and displaying images with compressed transfer syntaxes
+		depends on the availability of native or pure Java Image I/O (JIIO) codecs.
+		
+		Conversion from consumer formats (com.pixelmed.dicom.ImageToDicom) also
+		depends on the JIIO codecs.
+		
+		The JRE has only a limited set of codecs (baseline JPEG, GIF, PNG and BMP),
+		and additional pure Java codecs (JPEG 2000, TIFF, more robust baseline JPEG,
+		PNM) and native codecs (faster JPEG 2000, extended 12 bit lossy JPEG, lossless
+		JPEG, JPEG-LS) can be found in the Java Advanced Imaging Image I/O Tools
+		(JAI IIO).
+		
+		Binary builds are available from:
+		
+			http://web.archive.org/web/20150318212755/http://download.java.net/media/jai-imageio/builds/release/1.1/
+		
+		These can be used by either installing them into the JRE, or by including
+		the jar files in the classpath (and the native libraries in the path).
+		
+		Native libraries are not available on the Mac, but you can extract the
+		jai_imageio.jar file from one of the Unix distributions and use it in
+		the classpath. This has already been extracted and supplied in the
+		"dependencies" file of the current release.
+
+		Not required for building from source.
+		
+		For further documentation of the capabilities of the codecs, see:
+		
+			http://web.archive.org/web/20150318212755/http://download.java.net/media/jai-imageio/builds/release/1.1/jai_imageio-1_1-doc.zip
+
+Fonts and Internationalization
+
+		To support some international character sets, you need to be sure that your
+		JRE is installed with the charsets.jar file, which is optional on some
+		platforms. Make sure that during JRE install that you select the "custom
+		installation" and select the "Support for additional locales" feature. See:
+
+		http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6329080
+		
+		If you fail to do this, you may get an java.io.UnsupportedEncodingException.
+		
+		As far as fonts are concerned, see the discussion in section 4.2.6 Fonts
+		of the docs/DicomImageViewer/UserManual.pdf user guide.
+
+png2ico
+
+		The package "png2ico" is used to make Windows icon resource files for applications.
+		
+			https://www.winterdrache.de/freeware/png2ico/index.html
+		
+		On MacOS it is available from MacPorts:
+		
+			port install png2ico
+		
+Invocation.
+
+One the various jar files have been assembled, applications in the DICOM toolkit can be
+invoked as follows, using the com.pixelmed.display.DicomImageViewer as an example:
+
+java -Xmx512m -Xms512m -cp "./pixelmed.jar:./lib/additional/hsqldb.jar:./lib/additional/commons-compress-1.12.jar:./lib/additional/vecmath1.2-1.14.jar:./lib/additional/jmdns.jar:./lib/additional/commons-codec-1.3.jar:./lib/additional/jai_imageio.jar" com.pixelmed.display.DicomImageViewer
+
+Note that for practical display or processing of large DICOM images a lot of heap
+space is necessary, hence the "-Xmx512m -Xms512m".
+
+On some Windows Java installations, the Direct3D drivers (e.g., Nvidia) are buggy,
+and adding "-Dsun.java2d.d3d=false" will help; this can also be set from an
+environment variable "_JAVA_OPTIONS" ; see also
+
+	http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6762839
+	http://java.sun.com/j2se/1.5.0/docs/guide/2d/flags.html
+
+Development Documentation.
+
+To use the toolkit for your own applications, read the documentation of the classes
+provided, both as traditional Javadoc (see docs/javadoc/index.html) and as Doxygen
+(see docs/doxygen/html/index.html).
+
+Acknowledgements.
+
+Development of block selective redaaction of lossy JPEG files supported by funding
+from MDDX Research and Informatics.
+
+Localization of DicomCleaner, DicomImageBlackout, ApplicationEntityConfigurationDialog
+and NetworkApplicationConfigurationDialog funded by GE Healthcare and localization
+performed by SDL plc.
+
+Improvements to the WSI TIFF image conversion and development of the immunostaining
+coded concept selection have been funded in part with Federal funds from the
+National Cancer Institute, National Institutes of Health, under Task Order No.
+HHSN26110071 under Contract No. HHSN261201500003l (Imaging Data Commons).
