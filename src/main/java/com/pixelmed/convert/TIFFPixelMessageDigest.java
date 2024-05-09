@@ -9,7 +9,6 @@ import com.pixelmed.slf4j.Logger;
 import com.pixelmed.slf4j.LoggerFactory;
 import com.pixelmed.utils.HexDump;
 
-import javax.xml.bind.DatatypeConverter;
 import java.awt.color.ColorSpace;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;

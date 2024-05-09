@@ -2,15 +2,18 @@
 
 package com.pixelmed;
 
-import com.pixelmed.utils.Base64;
 
+import com.pixelmed.utils.Base64Double;
 import junit.framework.*;
 
-public class TestBase64_RoundTrip extends TestCase {
+import java.util.Base64;
+
+
+public class TestBase64_Double_RoundTrip extends TestCase {
 	
 	// constructor to support adding tests to suite ...
 	
-	public TestBase64_RoundTrip(String name) {
+	public TestBase64_Double_RoundTrip(String name) {
 		super(name);
 	}
 	
@@ -21,7 +24,7 @@ public class TestBase64_RoundTrip extends TestCase {
 	public static Test suite() {
 		TestSuite suite = new TestSuite("TestBase64_RoundTrip");
 		
-		suite.addTest(new TestBase64_RoundTrip("TestBase64_RoundTrip_SubNormalAllMantissaBitsSet"));
+		suite.addTest(new TestBase64_Double_RoundTrip("TestBase64_RoundTrip_SubNormalAllMantissaBitsSet"));
 		
 		return suite;
 	}
@@ -41,8 +44,8 @@ public class TestBase64_RoundTrip extends TestCase {
 		System.err.println();
 		assertEquals("string round trip",doubleValue,Double.parseDouble(Double.toString(doubleValue)));	// assures that double has been uniquely identified (even if string representation is not precise)
 		
-		String stringValue = Base64.getBase64(doubleValue);
-		assertEquals("floatingpointvalue",doubleValue,Base64.getDouble(stringValue));
+		String stringValue = Base64Double.getBase64(doubleValue);
+		assertEquals("floatingpointvalue",doubleValue,Base64Double.getDouble(stringValue));
 	}
 	
 

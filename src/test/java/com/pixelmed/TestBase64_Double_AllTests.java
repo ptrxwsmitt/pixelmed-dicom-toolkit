@@ -4,11 +4,11 @@ package com.pixelmed;
 
 import junit.framework.*;
 
-public class TestBase64_AllTests extends TestCase {
+public class TestBase64_Double_AllTests extends TestCase {
 	
 	public static Test suite() {
 		TestSuite suite = new TestSuite("All JUnit Tests");
-		suite.addTest(TestBase64_RoundTrip.suite());
+		suite.addTest(TestBase64_Double_RoundTrip.suite());
 		return suite;
 	}
 	

@@ -7,11 +7,12 @@ import com.pixelmed.slf4j.Logger;
 import com.pixelmed.slf4j.LoggerFactory;
 import com.pixelmed.utils.MessageLogger;
 import com.pixelmed.utils.PrintStreamMessageLogger;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -156,47 +157,39 @@ public class SetCharacteristicsFromSummary {
 		return a;
 	}
 
-	protected Attribute parseAttributeFromJSON(JsonObject obj,String name) throws DicomException {
+	protected Attribute parseAttributeFromJSON(JSONObject obj, String name) throws DicomException {
 		Attribute a = null;		// lazy instantiation - wait until we know what class of VR to use in case not in dictionary (e.g., private) (001295)
 		AttributeTag tag = getAttributeTagFromKeywordOrGroupAndElement(name);
 		if (tag == null) {	// (001143)
 			throw new DicomException("Unrecognized data element keyword for attribute: "+name);
 		}
-		JsonValue entry = obj.get(name);
-		JsonValue.ValueType valueType = entry.getValueType();
-		if (valueType == JsonValue.ValueType.STRING) {		// single valued attribute
-			String value = ((JsonString)entry).getString();
-			slf4jlogger.debug("parseAttributeFromJSON(): "+name+" : "+value);
-			if (value != null && value.length() > 0) {	// (001157)
+		Object entry = obj.get(name);
+		if (entry instanceof String entryStr) {		// single valued attribute
+			slf4jlogger.debug("parseAttributeFromJSON(): "+name+" : "+entryStr);
+			if (entryStr != null && entryStr.length() > 0) {	// (001157)
 				a = makeNewStringAttribute(tag);		// (001295)
-				a.addValue(value);
+				a.addValue(entryStr);
 			}
 			// if empty don't know VR to use for unknown attribute, fall through (001295)
-		}
-		else if (valueType == JsonValue.ValueType.OBJECT) {	// coded sequence item
+		} else if (entry instanceof JSONObject entryObj) {	// coded sequence item
 			a = makeNewSequenceAttribute(tag);	 // (001295)
-			if (!((JsonObject)entry).isNull("cv")) {
-				String codeValue = ((JsonObject)entry).getString("cv");
-				String codingSchemeDesignator = ((JsonObject)entry).getString("csd");
-				String codeMeaning = ((JsonObject)entry).getString("cm");
+			if (!entryObj.isNull("cv")) {
+				String codeValue = entryObj.getString("cv");
+				String codingSchemeDesignator = entryObj.getString("csd");
+				String codeMeaning = entryObj.getString("cm");
 				((SequenceAttribute)a).addItem(new CodedSequenceItem(codeValue,codingSchemeDesignator,codeMeaning).getAttributeList());
 			}
 			// else leave newly created attribute empty (presumably is Type 2)
-		}
-		else if (valueType == JsonValue.ValueType.ARRAY) {	// multi valued attribute or multiple sequence items
-			JsonArray arrayOfValues = (JsonArray)entry;
-			for (JsonValue arrayEntry : arrayOfValues) {
-				JsonValue.ValueType arrayEntryValueType = arrayEntry.getValueType();
-				if (arrayEntryValueType == JsonValue.ValueType.STRING) {
-					String value = ((JsonString)arrayEntry).getString();
+		} else if (entry instanceof JSONArray arrayOfValues) {	// multi valued attribute or multiple sequence items
+			for (Object arrayEntry : arrayOfValues) {
+				if (arrayEntry instanceof String arrayEntryStr) {
 					if (a == null) {
 						a = makeNewStringAttribute(tag);	 // (001295)
 					}
-					a.addValue(value);
-				}
-				else if (arrayEntryValueType == JsonValue.ValueType.OBJECT) {	// sequence item
+					a.addValue(arrayEntryStr);
+				} else if (arrayEntry instanceof JSONObject arrayEntryObj) {	// sequence item
 					AttributeList itemList = new AttributeList();
-					parseAttributesFromJSON((JsonObject)arrayEntry,itemList);	// recursive, so may be nested
+					parseAttributesFromJSON(arrayEntryObj,itemList);	// recursive, so may be nested
 					processAttributeListAfterReplacements(itemList);			// in case sub-class needs to add private creator(s)
 					if (a == null) {
 						a = makeNewSequenceAttribute(tag);	 // (001295)
@@ -214,70 +207,61 @@ public class SetCharacteristicsFromSummary {
 		return a;
 	}
 	
-	protected void parseAttributesFromJSON(JsonObject functionalGroupEntries,AttributeList list) throws DicomException {
+	protected void parseAttributesFromJSON(JSONObject functionalGroupEntries,AttributeList list) throws DicomException {
 		for (String name : functionalGroupEntries.keySet()) {
 			Attribute a = parseAttributeFromJSON(functionalGroupEntries,name);
 			list.put(a);
 		}
 	}
 	
-	protected void parseAttributeTagsFromJSON(JsonObject entries,Set<AttributeTag> tags) throws DicomException {
+	protected void parseAttributeTagsFromJSON(JSONObject entries,Set<AttributeTag> tags) throws DicomException {
 		for (String name : entries.keySet()) {
 			AttributeTag t = getAttributeTagFromKeywordOrGroupAndElement(name);
 			tags.add(t);
 		}
 	}
 	
-	protected void parseOptionsFromJSON(JsonObject entries) throws DicomException {
+	protected void parseOptionsFromJSON(JSONObject entries) throws DicomException {
 		slf4jlogger.debug("parseOptionsFromJSON():");
 		for (String name : entries.keySet()) {
-			JsonValue entry = entries.get(name);
-			JsonValue.ValueType valueType = entry.getValueType();
-			boolean optionBooleanValue = false;
-			if (valueType == JsonValue.ValueType.TRUE) {
-				optionBooleanValue = true;
+			Object entry = entries.get(name);
+			if(entry instanceof Boolean optionBooleanValue) {
+				slf4jlogger.debug("parseOptionsFromJSON(): {}} : {}",name,optionBooleanValue);
+				options.put(name,optionBooleanValue);
+			} else {
+				throw new DicomException("Unexpected valueType "+(entry!=null?entry.getClass():null)+" in options for "+name);
 			}
-			else if (valueType == JsonValue.ValueType.FALSE) {
-				optionBooleanValue = false;
-			}
-			else {
-				throw new DicomException("Unexpected valueType "+valueType+" in options for "+name);
-			}
-			slf4jlogger.debug("parseOptionsFromJSON(): {}} : {}",name,optionBooleanValue);
-			options.put(name,new Boolean(optionBooleanValue));
 		}
 	}
 	
-	protected void parseSummaryFile(String jsonfile) throws DicomException, FileNotFoundException {
-		JsonReader jsonReader = Json.createReader(new FileReader(jsonfile));
-		JsonObject obj = jsonReader.readObject();
-		
-		for (String functionalGroupName : obj.keySet()) {
-			JsonObject functionalGroupEntries = (JsonObject)(obj.get(functionalGroupName));
-			if (functionalGroupName.equals("options")) {
-				parseOptionsFromJSON(functionalGroupEntries);		// sets global options
-			}
-			else if (functionalGroupName.equals("remove")) {
-				parseAttributeTagsFromJSON(functionalGroupEntries,topLevelRemovalList);
-			}
-			else if (functionalGroupName.equals("removeall")) {
-				parseAttributeTagsFromJSON(functionalGroupEntries,recursiveRemovalList);
-			}
-			else if (functionalGroupName.equals("top")) {
-				parseAttributesFromJSON(functionalGroupEntries,topLevelReplacementsList);
-			}
-			else {
-				AttributeTag functionalGroupTag = dictionary.getTagFromName(functionalGroupName);
-				AttributeList list = functionalGroupsReplacementsList.get(functionalGroupTag);
-				if (list == null) {
-					list = new AttributeList();
-					functionalGroupsReplacementsList.put(functionalGroupTag,list);
+	protected void parseSummaryFile(String jsonfile) throws DicomException, IOException {
+			final String jsonString = Files.readString(Paths.get(jsonfile));
+			final JSONObject obj = new JSONObject(jsonString);
+			for (String functionalGroupName : obj.keySet()) {
+				final Object functionalGroup = obj.get(functionalGroupName);
+				if(functionalGroup instanceof JSONObject functionalGroupEntries) {
+					if (functionalGroupName.equals("options")) {
+						parseOptionsFromJSON(functionalGroupEntries);        // sets global options
+					} else if (functionalGroupName.equals("remove")) {
+						parseAttributeTagsFromJSON(functionalGroupEntries, topLevelRemovalList);
+					} else if (functionalGroupName.equals("removeall")) {
+						parseAttributeTagsFromJSON(functionalGroupEntries, recursiveRemovalList);
+					} else if (functionalGroupName.equals("top")) {
+						parseAttributesFromJSON(functionalGroupEntries, topLevelReplacementsList);
+					} else {
+						AttributeTag functionalGroupTag = dictionary.getTagFromName(functionalGroupName);
+						AttributeList list = functionalGroupsReplacementsList.get(functionalGroupTag);
+						if (list == null) {
+							list = new AttributeList();
+							functionalGroupsReplacementsList.put(functionalGroupTag, list);
+						}
+						parseAttributesFromJSON(functionalGroupEntries, list);
+					}
+				} else {
+					throw new DicomException("Unexpected valueType "+(functionalGroup!=null?functionalGroup.getClass():null)+" for "+functionalGroupName);
 				}
-				parseAttributesFromJSON(functionalGroupEntries,list);
 			}
-		}
-		jsonReader.close();
-	}
+    }
 	
 	// in case sub classes want to do stuff, e.g., add private creators
 	protected void processAttributeListAfterReplacements(AttributeList list) throws DicomException {

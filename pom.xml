@@ -35,23 +35,11 @@
             <version>3.10.0</version>
         </dependency>
 
-
-
-        <dependency>
-            <groupId>com.opencsv</groupId>
-            <artifactId>opencsv</artifactId>
-            <version>5.9</version>
-        </dependency>
-
-        <!-- TODO might be incompatible with mentioned jmdns lib -->
         <dependency>
             <groupId>javax.jmdns</groupId>
             <artifactId>jmdns</artifactId>
             <version>3.4.1</version>
         </dependency>
-
-
-        <!-- TODO might be incompatible with mentioned vecmath lib -->
         <dependency>
             <groupId>javax.vecmath</groupId>
             <artifactId>vecmath</artifactId>
@@ -64,14 +52,20 @@
             <version>${version.slf4j}</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.jpedal/jpedal-lgpl -->
-        <!-- TODO requires replacement, sources no longer available -->
+        <!-- TODO requires replacement, sources and library no longer available -->
 <!--        <dependency>-->
 <!--            <groupId>org.jpedal</groupId>-->
 <!--            <artifactId>jpedal-lgpl</artifactId>-->
 <!--            <version>4.74b27</version>-->
 <!--        </dependency>-->
 
-        <!-- xml/json -->
+        <!-- data formats -->
+        <!-- https://mvnrepository.com/artifact/com.opencsv/opencsv -->
+        <dependency>
+            <groupId>com.opencsv</groupId>
+            <artifactId>opencsv</artifactId>
+            <version>5.9</version>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/net.sf.saxon/Saxon-HE -->
         <dependency>
             <groupId>net.sf.saxon</groupId>
@@ -84,8 +78,6 @@
             <artifactId>xmlresolver</artifactId>
             <version>6.0.4</version>
         </dependency>
-
-        <!-- TODO might be incompatible with mentioned json lib -->
         <!-- https://mvnrepository.com/artifact/org.json/json -->
         <dependency>
             <groupId>org.json</groupId>

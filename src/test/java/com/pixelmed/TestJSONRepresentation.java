@@ -5,11 +5,9 @@ package com.pixelmed;
 import junit.framework.*;
 
 import com.pixelmed.dicom.*;
+import org.json.JSONArray;
 
 import java.io.File;
-
-import javax.json.Json;
-import javax.json.JsonArray;
 
 import java.util.Locale;
 
@@ -313,7 +311,7 @@ public class TestJSONRepresentation extends TestCase {
 		list.putAll(createHeaderAttributeList());
 		//list.insertSuitableSpecificCharacterSetForAllStringValues();
 		
-		JsonArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list);
+		JSONArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list);
 //System.err.println(jsonDocument);
 
 		AttributeList roundTripList = new JSONRepresentationOfDicomObjectFactory().getAttributeList(jsonDocument);
@@ -346,7 +344,7 @@ public class TestJSONRepresentation extends TestCase {
 		FileMetaInformation.addFileMetaInformation(list,TransferSyntax.ExplicitVRLittleEndian,"OURAETITLE");
 		list.write(fileToStore,TransferSyntax.ExplicitVRLittleEndian,true/*useMeta*/,true/*useBufferedStream*/);
 
-		JsonArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(fileToStore);
+		JSONArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(fileToStore);
 //System.err.println(jsonDocument);
 
 		AttributeList roundTripList = new JSONRepresentationOfDicomObjectFactory().getAttributeList(jsonDocument);
@@ -364,7 +362,7 @@ public class TestJSONRepresentation extends TestCase {
 		//list.insertSuitableSpecificCharacterSetForAllStringValues();
 
 
-		JsonArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list);
+		JSONArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list);
 //System.err.println(jsonDocument);
 
 		File fileToStore = File.createTempFile("testStructuredReport_JSONRepresentation_DicomFile",".json");
@@ -383,7 +381,7 @@ public class TestJSONRepresentation extends TestCase {
 		list.putAll(createHeaderAttributeList());
 		//list.insertSuitableSpecificCharacterSetForAllStringValues();
 
-		JsonArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,false/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,true/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,true/*ignoreSR*/,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
+		JSONArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,false/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,true/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,true/*ignoreSR*/,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
 //System.err.println(jsonDocument);
 
 		AttributeList roundTripList = new JSONRepresentationOfDicomObjectFactory().getAttributeList(jsonDocument);
@@ -415,7 +413,7 @@ public class TestJSONRepresentation extends TestCase {
 		list.putAll(createHeaderAttributeList());
 		//list.insertSuitableSpecificCharacterSetForAllStringValues();
 
-		JsonArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,false/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,true/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,false/*ignoreSR*/,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
+		JSONArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,false/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,true/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,false/*ignoreSR*/,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
 //System.err.println(jsonDocument);
 
 		AttributeList roundTripList = new JSONRepresentationOfDicomObjectFactory().getAttributeList(jsonDocument,false/*ignoreUnrecognizedTags*/,true/*ignoreSR*/);
@@ -447,7 +445,7 @@ public class TestJSONRepresentation extends TestCase {
 		list.putAll(createHeaderAttributeList());
 		//list.insertSuitableSpecificCharacterSetForAllStringValues();
 
-		JsonArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,false/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,true/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,true/*ignoreSR*/,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
+		JSONArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,false/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,true/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,true/*ignoreSR*/,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
 //System.err.println(jsonDocument);
 
 		AttributeList roundTripList = new JSONRepresentationOfDicomObjectFactory().getAttributeList(jsonDocument,false/*ignoreUnrecognizedTags*/,true/*ignoreSR*/);
@@ -478,8 +476,8 @@ public class TestJSONRepresentation extends TestCase {
 		AttributeList list = sr.getAttributeList();
 		list.putAll(createHeaderAttributeList());
 		//list.insertSuitableSpecificCharacterSetForAllStringValues();
-		
-		JsonArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,false/*ignoreSR*/,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
+
+		JSONArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,false/*ignoreSR*/,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
 //System.err.println(jsonDocument);
 
 		AttributeList roundTripList = new JSONRepresentationOfDicomObjectFactory().getAttributeList(jsonDocument);
@@ -498,8 +496,8 @@ public class TestJSONRepresentation extends TestCase {
 		AttributeList list = sr.getAttributeList();
 		list.putAll(createHeaderAttributeList());
 		//list.insertSuitableSpecificCharacterSetForAllStringValues();
-		
-		JsonArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,true/*collapseValueArrays*/,false/*collapseEmptyToNull*/,false/*ignoreSR*/,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
+
+		JSONArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,true/*collapseValueArrays*/,false/*collapseEmptyToNull*/,false/*ignoreSR*/,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
 //System.err.println(jsonDocument);
 
 		AttributeList roundTripList = new JSONRepresentationOfDicomObjectFactory().getAttributeList(jsonDocument);
@@ -518,8 +516,8 @@ public class TestJSONRepresentation extends TestCase {
 		AttributeList list = sr.getAttributeList();
 		list.putAll(createHeaderAttributeList());
 		//list.insertSuitableSpecificCharacterSetForAllStringValues();
-		
-		JsonArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,true/*collapseValueArrays*/,true/*collapseEmptyToNull*/,false/*ignoreSR*/,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
+
+		JSONArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,true/*collapseValueArrays*/,true/*collapseEmptyToNull*/,false/*ignoreSR*/,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
 //System.err.println(jsonDocument);
 
 		AttributeList roundTripList = new JSONRepresentationOfDicomObjectFactory().getAttributeList(jsonDocument);
@@ -538,8 +536,8 @@ public class TestJSONRepresentation extends TestCase {
 		AttributeList list = sr.getAttributeList();
 		list.putAll(createHeaderAttributeList());
 		//list.insertSuitableSpecificCharacterSetForAllStringValues();
-		
-		JsonArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,false/*collapseValueArrays*/,true/*collapseEmptyToNull*/,false/*ignoreSR*/,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
+
+		JSONArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,false/*collapseValueArrays*/,true/*collapseEmptyToNull*/,false/*ignoreSR*/,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
 //System.err.println(jsonDocument);
 
 		AttributeList roundTripList = new JSONRepresentationOfDicomObjectFactory().getAttributeList(jsonDocument);
@@ -559,7 +557,7 @@ public class TestJSONRepresentation extends TestCase {
 		list.putAll(createHeaderAttributeList());
 		//list.insertSuitableSpecificCharacterSetForAllStringValues();
 
-		JsonArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,false/*ignoreSR*/,true/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
+		JSONArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,false/*ignoreSR*/,true/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
 //System.err.println(jsonDocument);
 
 		AttributeList roundTripList = new JSONRepresentationOfDicomObjectFactory().getAttributeList(jsonDocument);
@@ -573,7 +571,7 @@ public class TestJSONRepresentation extends TestCase {
 		list.putAll(createHeaderAttributeList());
 		//list.insertSuitableSpecificCharacterSetForAllStringValues();
 
-		JsonArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,false/*ignoreSR*/,false/*substituteUIDKeywords*/,true/*useNumberForIntegerOrDecimalString*/);
+		JSONArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,false/*ignoreSR*/,false/*substituteUIDKeywords*/,true/*useNumberForIntegerOrDecimalString*/);
 //System.err.println(jsonDocument);
 
 		AttributeList roundTripList = new JSONRepresentationOfDicomObjectFactory().getAttributeList(jsonDocument);
@@ -587,7 +585,7 @@ public class TestJSONRepresentation extends TestCase {
 		list.putAll(createHeaderAttributeList());
 		//list.insertSuitableSpecificCharacterSetForAllStringValues();
 
-		JsonArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,true/*collapseValueArrays*/,true/*collapseEmptyToNull*/,false/*ignoreSR*/,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
+		JSONArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,true/*collapseValueArrays*/,true/*collapseEmptyToNull*/,false/*ignoreSR*/,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
 //System.err.println(jsonDocument);
 
 		AttributeList roundTripList = new JSONRepresentationOfDicomObjectFactory().getAttributeList(jsonDocument);
@@ -601,7 +599,7 @@ public class TestJSONRepresentation extends TestCase {
 		list.putAll(createHeaderAttributeList());
 		//list.insertSuitableSpecificCharacterSetForAllStringValues();
 
-		JsonArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,true/*collapseValueArrays*/,true/*collapseEmptyToNull*/,false/*ignoreSR*/,false/*substituteUIDKeywords*/,true/*useNumberForIntegerOrDecimalString*/);
+		JSONArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,true/*collapseValueArrays*/,true/*collapseEmptyToNull*/,false/*ignoreSR*/,false/*substituteUIDKeywords*/,true/*useNumberForIntegerOrDecimalString*/);
 //System.err.println(jsonDocument);
 
 		AttributeList roundTripList = new JSONRepresentationOfDicomObjectFactory().getAttributeList(jsonDocument);
@@ -622,7 +620,7 @@ public class TestJSONRepresentation extends TestCase {
 		
 		// except for ignoreSR which must be false, obviously
 
-		JsonArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,collapseAttributeValueArrays,collapseEmptyToNull,false/*ignoreSR*/,substituteUIDKeywords,false/*useNumberForIntegerOrDecimalString*/);
+		JSONArray jsonDocument = new JSONRepresentationOfDicomObjectFactory().getDocument(list,true/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*addVR*/,collapseAttributeValueArrays,collapseEmptyToNull,false/*ignoreSR*/,substituteUIDKeywords,false/*useNumberForIntegerOrDecimalString*/);
 //System.err.println(jsonDocument);
 
 		AttributeList roundTripList = new JSONRepresentationOfDicomObjectFactory().getAttributeList(jsonDocument);
