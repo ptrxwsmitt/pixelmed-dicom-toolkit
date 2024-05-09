@@ -2,21 +2,8 @@
 
 package com.pixelmed.dicom;
 
-import com.pixelmed.utils.HexDump;
 import com.pixelmed.utils.StringUtilities;
 
-import javax.json.Json;
-import javax.json.JsonArray;
-import javax.json.JsonArrayBuilder;
-import javax.json.JsonBuilderFactory;
-import javax.json.JsonNumber;
-import javax.json.JsonObject;
-import javax.json.JsonObjectBuilder;
-import javax.json.JsonReader;
-import javax.json.JsonString;
-import javax.json.JsonStructure;
-import javax.json.JsonValue;
-import javax.json.JsonWriter;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -29,11 +16,14 @@ import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+import java.util.Base64;
 import java.util.Iterator;
 import java.util.Vector;
 
 import com.pixelmed.slf4j.Logger;
 import com.pixelmed.slf4j.LoggerFactory;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * <p>A class to encode a representation of a DICOM object in a JSON form, and to convert it back again.</p>
@@ -197,7 +187,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 		return tag;
 	}
 
-	public static String getJsonPersonNameFromPropertiesInJsonObject(JsonObject jsonObjectValue,String alphabeticProperty,String ideographicProperty,String phoneticProperty) {
+	public static String getJsonPersonNameFromPropertiesInJsonObject(JSONObject jsonObjectValue, String alphabeticProperty, String ideographicProperty, String phoneticProperty) {
 		StringBuffer buf = new StringBuffer();
 		String alphabetic = "";
 		String ideographic = "";
@@ -248,14 +238,14 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @param	ignoreSR				whether or not to ignore SR Content Items (e.g., when used with JSONRepresentationOfStructuredReportObjectFactory)
 	 * @throws	DicomException
 	 */
-	void addAttributesFromJsonObjectToList(AttributeList list,JsonObject parent,boolean ignoreUnrecognizedTags,boolean ignoreSR) throws DicomException {
+	void addAttributesFromJsonObjectToList(AttributeList list,JSONObject parent,boolean ignoreUnrecognizedTags,boolean ignoreSR) throws DicomException {
 		DicomDictionary dictionary = list.getDictionary();
 		if (parent != null) {
 			// a JsonObject is a Map<String,JsonValue>, so iterate through map entry keys
 			for (String elementName : parent.keySet()) {
 				slf4jlogger.debug("JSON elementName = {}",elementName);
 				String jsonSingleValue = null;
-				JsonObject jsonAttributeVRAndValue = null;
+				JSONObject jsonAttributeVRAndValue = null;
 				{
 					JsonValue jsonAttributeVRAndValueAsJsonValue = parent.get(elementName);
 					if (jsonAttributeVRAndValueAsJsonValue != null) {
@@ -344,11 +334,11 @@ public class JSONRepresentationOfDicomObjectFactory {
 							}
 							else {
 								// jsonSingleValue will already have been found and set by now, instead of jsonAttributeVRAndValue
-								JsonArray values = null;
+								JSONArray values = null;
 								String inLineBinary = null;
 								if (jsonAttributeVRAndValue != null) {
 									try {
-										values = jsonAttributeVRAndValue.getJsonArray("Value");
+										values = jsonAttributeVRAndValue.getJSONArray("Value");
 									}
 									catch (ClassCastException e) {
 										throw new DicomException("Expected array values for tag "+elementName);
@@ -373,11 +363,11 @@ public class JSONRepresentationOfDicomObjectFactory {
 								if (ValueRepresentation.isSequenceVR(vr)) {
 									SequenceAttribute a = new SequenceAttribute(tag);
 									//System.err.println("Created "+a);
-									if (values != null && values.size() > 0) {
-										for (int i=0; i<values.size(); ++i) {
-											JsonObject childJsonObject = null;
+									if (values != null && values.length() > 0) {
+										for (int i=0; i<values.length(); ++i) {
+											JSONObject childJsonObject = null;
 											try {
-												childJsonObject = values.getJsonObject(i);
+												childJsonObject = values.getJSONObject(i);
 											}
 											catch (ClassCastException e) {
 												throw new DicomException("Expected object for sequence attribute "+elementName);
@@ -403,9 +393,9 @@ public class JSONRepresentationOfDicomObjectFactory {
 										stringValue = substituteUIDForKeywordIfPossibleAndAppropriateForVR(stringValue,vr);
 										a.addValue(stringValue);
 									}
-									else if (values != null && values.size() > 0) {
+									else if (values != null && values.length() > 0) {
 										// values is a List<JsonValue> so can use List.get method to get JsonValue and then switch on its type
-										for (int i=0; i<values.size(); ++i) {
+										for (int i=0; i<values.length(); ++i) {
 											JsonValue value = values.get(i);
 											JsonValue.ValueType valueType = value.getValueType();
 											if (valueType == JsonValue.ValueType.STRING) {
@@ -446,7 +436,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 									else if (inLineBinary != null && inLineBinary.length() > 0) {
 										if (ValueRepresentation.isBase64EncodedInJSON(vr)) {
 											slf4jlogger.debug("addAttributesFromJsonObjectToList(): Base64 String VR");
-											byte[] b = javax.xml.bind.DatatypeConverter.parseBase64Binary(inLineBinary);
+											byte[] b = Base64.getDecoder().decode(inLineBinary);
 											slf4jlogger.debug("addAttributesFromJsonObjectToList(): Base64 decodes as array of length {}",b.length);
 											a.setValues(b,false/*big*/);
 										}
