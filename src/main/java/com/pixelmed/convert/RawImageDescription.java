@@ -2,28 +2,15 @@
 
 package com.pixelmed.convert;
 
-import com.pixelmed.dicom.BinaryInputStream;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.LineNumberReader;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.TreeMap;
-
-import javax.json.Json;
-import javax.json.JsonArray;
-import javax.json.JsonObject;
-import javax.json.JsonReader;
-import javax.json.JsonString;
-import javax.json.JsonValue;
-
 import com.pixelmed.slf4j.Logger;
 import com.pixelmed.slf4j.LoggerFactory;
+import org.json.JSONObject;
+
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * <p>A class for extracting a JSON encoded raw input format description.</p>
@@ -150,22 +137,33 @@ public class RawImageDescription {
 	protected boolean isDataBigEndian;
 	
 	public RawImageDescription(File formatFile) throws IOException, NumberFormatException {
-		JsonReader jsonReader = Json.createReader(new FileReader(formatFile));
-		JsonObject obj = jsonReader.readObject();
-		for (String name : obj.keySet()) {
-			JsonValue entry = obj.get(name);
-			switch (name) {
-				case "type":	type = Type.getType(((JsonString)entry).getString()); break;
-				case "rows":	rows = Integer.parseInt(((JsonString)entry).getString()); break;
-				case "columns":	columns = Integer.parseInt(((JsonString)entry).getString()); break;
-				case "frames":	frames = Integer.parseInt(((JsonString)entry).getString()); break;
-				case "endian":	isDataBigEndian = ((JsonString)entry).getString().toLowerCase().equals("big"); break;
+		try(final var reader = new FileReader(formatFile)) {
+			JSONObject obj = new JSONObject(reader);
+			for (String name : obj.keySet()) {
+				String entry = obj.getString(name);
+				switch (name) {
+					case "type":
+						type = Type.getType(entry);
+						break;
+					case "rows":
+						rows = Integer.parseInt(entry);
+						break;
+					case "columns":
+						columns = Integer.parseInt(entry);
+						break;
+					case "frames":
+						frames = Integer.parseInt(entry);
+						break;
+					case "endian":
+						isDataBigEndian = entry.equalsIgnoreCase("big");
+						break;
+				}
 			}
 		}
 	}
 	
 	public String toString() {
-		StringBuffer buf = new StringBuffer();
+		StringBuilder buf = new StringBuilder();
 		buf.append("type = "+Type.toString(type)+"\n");
 		buf.append("rows = "+rows+"\n");
 		buf.append("columns = "+columns+"\n");

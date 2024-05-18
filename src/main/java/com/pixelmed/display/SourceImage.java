@@ -2012,23 +2012,23 @@ public class SourceImage {
 	
 	// See "http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038" Bug ID: 4724038 (fs) Add unmap method to MappedByteBuffer
 	//
-	protected static void clean(final Object object) throws Exception {
-		java.security.AccessController.doPrivileged(new java.security.PrivilegedAction() {
-				public Object run() {
-					slf4jlogger.debug("clean.run()");
-					try {
-						java.lang.reflect.Method getCleanerMethod = object.getClass().getMethod("cleaner",new Class[0]);
-						getCleanerMethod.setAccessible(true);
-						sun.misc.Cleaner cleaner = (sun.misc.Cleaner)getCleanerMethod.invoke(object,new Object[0]);
-						cleaner.clean();
-					}
-					catch(Exception e) {
-						slf4jlogger.error("",e);
-					}
-					return null;
-				}
-			});
-	}
+//	protected static void clean(final Object object) throws Exception {
+//		java.security.AccessController.doPrivileged(new java.security.PrivilegedAction() {
+//				public Object run() {
+//					slf4jlogger.debug("clean.run()");
+//					try {
+//						java.lang.reflect.Method getCleanerMethod = object.getClass().getMethod("cleaner",new Class[0]);
+//						getCleanerMethod.setAccessible(true);
+//						sun.misc.Cleaner cleaner = (sun.misc.Cleaner)getCleanerMethod.invoke(object,new Object[0]);
+//						cleaner.clean();
+//					}
+//					catch(Exception e) {
+//						slf4jlogger.error("",e);
+//					}
+//					return null;
+//				}
+//			});
+//	}
 
 	protected BufferedImageSource bufferedImageSource = null;
 	protected FileInputStream memoryMappedFileInputStream = null;
@@ -2044,7 +2044,8 @@ public class SourceImage {
 			for (int f=0; f<memoryMappedByteBuffers.length; ++f) {
 				ByteBuffer memoryMappedByteBuffer = memoryMappedByteBuffers[f];
 				if (memoryMappedByteBuffer != null) {
-					clean(memoryMappedByteBuffer);
+					//this is not the same as clean() or unmap()
+					//clean(memoryMappedByteBuffer);
 					memoryMappedByteBuffers[f] = null;
 				}
 			}
@@ -2072,6 +2073,7 @@ public class SourceImage {
 			memoryMappedFileInputStream.close();
 			memoryMappedFileInputStream = null;
 		}
+		System.gc();
 	}
 	
 	protected void finalize() throws Throwable {
