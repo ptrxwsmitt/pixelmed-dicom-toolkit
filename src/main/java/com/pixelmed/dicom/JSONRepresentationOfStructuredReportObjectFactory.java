@@ -4,23 +4,15 @@ package com.pixelmed.dicom;
 
 import com.pixelmed.utils.StringUtilities;
 
-import javax.json.Json;
-import javax.json.JsonArray;
-import javax.json.JsonArrayBuilder;
-import javax.json.JsonBuilderFactory;
-import javax.json.JsonNumber;
-import javax.json.JsonObject;
-import javax.json.JsonObjectBuilder;
-import javax.json.JsonReader;
-import javax.json.JsonString;
-import javax.json.JsonValue;
-import javax.json.JsonWriter;
-
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import com.pixelmed.slf4j.Logger;
 import com.pixelmed.slf4j.LoggerFactory;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  * <p>A class to encode a representation of a DICOM Structured Report object in a JSON form,
@@ -36,7 +28,7 @@ try {
     AttributeList list = new AttributeList();
     list.read("dicomsrfile",null,true,true);
 	StructuredReport sr = new StructuredReport(list);
-    JsonArray document = new JSONRepresentationOfStructuredReportObjectFactory().getDocument(sr);
+    JSONArray document = new JSONRepresentationOfStructuredReportObjectFactory().getDocument(sr);
     JSONRepresentationOfStructuredReportObjectFactory.write(System.out,document);
 } catch (Exception e) {
     slf4jlogger.error("",e);
@@ -50,7 +42,7 @@ try {
     AttributeList list = new AttributeList();
     list.read("dicomsrfile",null,true,true);
 	StructuredReport sr = new StructuredReport(list);
-    JsonArray document = new JSONRepresentationOfStructuredReportObjectFactory().getDocument(sr,list);
+    JSONArray document = new JSONRepresentationOfStructuredReportObjectFactory().getDocument(sr,list);
     JSONRepresentationOfStructuredReportObjectFactory.write(System.out,document);
 } catch (Exception e) {
     slf4jlogger.error("",e);
@@ -78,7 +70,7 @@ try {
 public class JSONRepresentationOfStructuredReportObjectFactory {
 	private static final String identString = "@(#) $Header: /userland/cvs/pixelmed/imgbook/com/pixelmed/dicom/JSONRepresentationOfStructuredReportObjectFactory.java,v 1.32 2022/01/21 19:51:16 dclunie Exp $";
 
-	private static final Logger slf4jlogger = LoggerFactory.getLogger(JSONRepresentationOfStructuredReportObjectFactory.class);
+	private static final Logger LOG = LoggerFactory.getLogger(JSONRepresentationOfStructuredReportObjectFactory.class);
 	
 	protected static boolean elideSeparateContinuityOfContent = true;
 	
@@ -153,7 +145,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	protected static String reservedKeywordForPhoneticPropertyInPersonNameContentItem = symbolSignifyingReservedKeyword+"phonetic";
 
 	protected boolean isCommonAnnotationAttribute(String attributeName) {
-		return attributeName!= null && attributeName.length() > 0 && (
+		return attributeName!= null && !attributeName.isEmpty() && (
 			   attributeName.equals(reservedKeywordForSimplifiedLabelAttributeInSRFile)
 			|| attributeName.equals(reservedKeywordForSimplifiedReferenceToLabelAttributeInSRFile)
 			|| attributeName.equals(reservedKeywordForObservationDateTimeAttributeInSRFile)
@@ -162,8 +154,6 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	}
 
 	protected static String simplifiedLabelPrefix = "label";
-
-	private JsonBuilderFactory factory;
 	
 	protected Map<String,CodedSequenceItem> businessNames = new HashMap<String,CodedSequenceItem>();
 	protected Map<String,SortedSet<String>> valueTypesByBusinessName = new HashMap<String,SortedSet<String>>();
@@ -190,27 +180,27 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	public CodedSequenceItem getCodedSequenceItemForBusinessName(String businessName,String location,boolean roleIsAsConceptName) {
 		CodedSequenceItem businessNameCode = null;
 		if (businessName == null) {
-			slf4jlogger.error("getCodedSequenceItemForBusinessNameUsedAsConceptName(): {}: Null string for business name used as concept name",location);
+			LOG.error("getCodedSequenceItemForBusinessNameUsedAsConceptName(): {}: Null string for business name used as concept name",location);
 		}
 		else if (businessName.length() == 0) {
-			slf4jlogger.warn("getCodedSequenceItemForBusinessNameUsedAsConceptName(): {}: Empty string for business name used as concept name - should be using reserved word instead ",location);
+			LOG.warn("getCodedSequenceItemForBusinessNameUsedAsConceptName(): {}: Empty string for business name used as concept name - should be using reserved word instead ",location);
 		}
 		else if (businessName.equals(businessNameToUseForAnonymousContentItems)) {
 			if (roleIsAsConceptName) {
-				slf4jlogger.debug("getCodedSequenceItemForBusinessNameUsedAsConceptName(): {}: Encountered reserved anonymous business name keyword used as concept name {} ",location,businessName);
+				LOG.debug("getCodedSequenceItemForBusinessNameUsedAsConceptName(): {}: Encountered reserved anonymous business name keyword used as concept name {} ",location,businessName);
 			}
 			else {
-				slf4jlogger.error("getCodedSequenceItemForBusinessNameUsedAsValue(): {}: Cannot use reserved anonymous business name keyword as concept value {} ",location,businessName);
+				LOG.error("getCodedSequenceItemForBusinessNameUsedAsValue(): {}: Cannot use reserved anonymous business name keyword as concept value {} ",location,businessName);
 			}
 			// in either case, fall through with null ...
 		}
 		else {
 			businessNameCode = businessNames.get(businessName);
 			if (businessNameCode == null) {
-				slf4jlogger.error("getCodedSequenceItemForBusinessNameUsedAsConceptName(): {}: Could not find a code for business name used as concept name {} ",location,businessName);
+				LOG.error("getCodedSequenceItemForBusinessNameUsedAsConceptName(): {}: Could not find a code for business name used as concept name {} ",location,businessName);
 			}
 			else {
-				slf4jlogger.debug("getCodedSequenceItemForBusinessNameUsedAsConceptName(): {}: Code for business name used as concept name {} is {}",location,businessName,businessNameCode.toString());
+				LOG.debug("getCodedSequenceItemForBusinessNameUsedAsConceptName(): {}: Code for business name used as concept name {} is {}",location,businessName,businessNameCode.toString());
 			}
 		}
 		return businessNameCode;
@@ -228,77 +218,73 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 		return getCodedSequenceItemForBusinessName(businessName,location,false/*roleIsAsConceptName*/);
 	}
 
-	public JsonArray getBusinessNamesDocument() {
-		slf4jlogger.debug("getBusinessNamesDocument():");
-		JsonArrayBuilder arrayBuilder = factory.createArrayBuilder();
+	public JSONArray getBusinessNamesDocument() {
+		LOG.debug("getBusinessNamesDocument():");
+		JSONArray arrayBuilder = new JSONArray();
 		for (String businessName : businessNames.keySet()) {
 			CodedSequenceItem csi = businessNames.get(businessName);
-			if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("getBusinessNamesDocument(): Creating JSON business name {} for {}",businessName,csi);
+			if (LOG.isDebugEnabled()) LOG.debug("getBusinessNamesDocument(): Creating JSON business name {} for {}",businessName,csi);
 			// each entry will be object { "_cv" : "codevalue", "_csd" : "codingschemedesignator", "_cm" : "code meaning" }
-			JsonObjectBuilder jsonCodedSequenceItem = factory.createObjectBuilder();
-			jsonCodedSequenceItem.add(reservedKeywordForCodeValueInBusinessNamesFile,csi.getCodeValue());
-			jsonCodedSequenceItem.add(reservedKeywordForCodingSchemeDesignatorInBusinessNamesFile,csi.getCodingSchemeDesignator());
-			jsonCodedSequenceItem.add(reservedKeywordForCodeMeaningInBusinessNamesFile,csi.getCodeMeaning());
+			JSONObject jsonCodedSequenceItem = new JSONObject();
+			jsonCodedSequenceItem.put(reservedKeywordForCodeValueInBusinessNamesFile,csi.getCodeValue());
+			jsonCodedSequenceItem.put(reservedKeywordForCodingSchemeDesignatorInBusinessNamesFile,csi.getCodingSchemeDesignator());
+			jsonCodedSequenceItem.put(reservedKeywordForCodeMeaningInBusinessNamesFile,csi.getCodeMeaning());
 			
-			{ String s = csi.getCodingSchemeVersion(); if (s.length() > 0) jsonCodedSequenceItem.add(reservedKeywordForCodingSchemeVersionInBusinessNamesFile,s); }
-			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("LongCodeValue")); if (s.length() > 0) jsonCodedSequenceItem.add(reservedKeywordForLongCodeValueInBusinessNamesFile,s); }
-			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("URNCodeValue")); if (s.length() > 0) jsonCodedSequenceItem.add(reservedKeywordForURNCodeValueInBusinessNamesFile,s); }
-			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("ContextIdentifier")); if (s.length() > 0) jsonCodedSequenceItem.add(reservedKeywordForContextIdentifierInBusinessNamesFile,s); }
-			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("ContextUID")); if (s.length() > 0) jsonCodedSequenceItem.add(reservedKeywordForContextUIDInBusinessNamesFile,s); }
-			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("MappingResource")); if (s.length() > 0) jsonCodedSequenceItem.add(reservedKeywordForMappingResourceInBusinessNamesFile,s); }
-			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("MappingResourceUID")); if (s.length() > 0) jsonCodedSequenceItem.add(reservedKeywordForMappingResourceUIDInBusinessNamesFile,s); }
-			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("MappingResourceName")); if (s.length() > 0) jsonCodedSequenceItem.add(reservedKeywordForMappingResourceNameInBusinessNamesFile,s); }
-			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("ContextGroupVersion")); if (s.length() > 0) jsonCodedSequenceItem.add(reservedKeywordForContextGroupVersionInBusinessNamesFile,s); }
-			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("ContextGroupExtensionFlag")); if (s.length() > 0) jsonCodedSequenceItem.add(reservedKeywordForContextGroupExtensionFlagInBusinessNamesFile,s); }
-			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("ContextGroupLocalVersion")); if (s.length() > 0) jsonCodedSequenceItem.add(reservedKeywordForContextGroupLocalVersionInBusinessNamesFile,s); }
-			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("ContextGroupExtensionCreatorUID")); if (s.length() > 0) jsonCodedSequenceItem.add(reservedKeywordForContextGroupExtensionCreatorUIDInBusinessNamesFile,s); }
+			{ String s = csi.getCodingSchemeVersion(); if (s.length() > 0) jsonCodedSequenceItem.put(reservedKeywordForCodingSchemeVersionInBusinessNamesFile,s); }
+			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("LongCodeValue")); if (s.length() > 0) jsonCodedSequenceItem.put(reservedKeywordForLongCodeValueInBusinessNamesFile,s); }
+			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("URNCodeValue")); if (s.length() > 0) jsonCodedSequenceItem.put(reservedKeywordForURNCodeValueInBusinessNamesFile,s); }
+			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("ContextIdentifier")); if (s.length() > 0) jsonCodedSequenceItem.put(reservedKeywordForContextIdentifierInBusinessNamesFile,s); }
+			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("ContextUID")); if (s.length() > 0) jsonCodedSequenceItem.put(reservedKeywordForContextUIDInBusinessNamesFile,s); }
+			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("MappingResource")); if (s.length() > 0) jsonCodedSequenceItem.put(reservedKeywordForMappingResourceInBusinessNamesFile,s); }
+			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("MappingResourceUID")); if (s.length() > 0) jsonCodedSequenceItem.put(reservedKeywordForMappingResourceUIDInBusinessNamesFile,s); }
+			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("MappingResourceName")); if (s.length() > 0) jsonCodedSequenceItem.put(reservedKeywordForMappingResourceNameInBusinessNamesFile,s); }
+			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("ContextGroupVersion")); if (s.length() > 0) jsonCodedSequenceItem.put(reservedKeywordForContextGroupVersionInBusinessNamesFile,s); }
+			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("ContextGroupExtensionFlag")); if (s.length() > 0) jsonCodedSequenceItem.put(reservedKeywordForContextGroupExtensionFlagInBusinessNamesFile,s); }
+			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("ContextGroupLocalVersion")); if (s.length() > 0) jsonCodedSequenceItem.put(reservedKeywordForContextGroupLocalVersionInBusinessNamesFile,s); }
+			{ String s = Attribute.getSingleStringValueOrEmptyString(csi.getAttributeList(),DicomDictionary.StandardDictionary.getTagFromName("ContextGroupExtensionCreatorUID")); if (s.length() > 0) jsonCodedSequenceItem.put(reservedKeywordForContextGroupExtensionCreatorUIDInBusinessNamesFile,s); }
 
 			{
 				SortedSet<String> valueTypes = valueTypesByBusinessName.get(businessName);
 				if (valueTypes != null && valueTypes.size() > 0) {
-					JsonArrayBuilder jsonValueTypes = factory.createArrayBuilder();
+					JSONArray jsonValueTypes = new JSONArray();
 					for (String valueType : valueTypes) {
 						if (valueType != null && valueType.length() > 0) {
-							jsonValueTypes.add(valueType);
+							jsonValueTypes.put(valueType);
 						}
 					}
-					jsonCodedSequenceItem.add(reservedKeywordForValueTypeInBusinessNamesFile,jsonValueTypes);
+					jsonCodedSequenceItem.put(reservedKeywordForValueTypeInBusinessNamesFile,jsonValueTypes);
 				}
 			}
 			{
 				SortedSet<String> relationshipTypes = relationshipTypesByBusinessName.get(businessName);
 				if (relationshipTypes != null && relationshipTypes.size() > 0) {
-					JsonArrayBuilder jsonRelationshipTypes = factory.createArrayBuilder();
+					JSONArray jsonRelationshipTypes = new JSONArray();
 					for (String relationshipType : relationshipTypes) {
 						if (relationshipType != null && relationshipType.length() > 0) {
-							jsonRelationshipTypes.add(relationshipType);
+							jsonRelationshipTypes.put(relationshipType);
 						}
 					}
-					jsonCodedSequenceItem.add(reservedKeywordForRelationshipTypeInBusinessNamesFile,jsonRelationshipTypes);
+					jsonCodedSequenceItem.put(reservedKeywordForRelationshipTypeInBusinessNamesFile,jsonRelationshipTypes);
 				}
 			}
 
-			JsonObjectBuilder jsonBusinessNameEntry = factory.createObjectBuilder();
-			jsonBusinessNameEntry.add(businessName,jsonCodedSequenceItem);
+			JSONObject jsonBusinessNameEntry = new JSONObject();
+			jsonBusinessNameEntry.put(businessName,jsonCodedSequenceItem);
 			
-			arrayBuilder.add(jsonBusinessNameEntry);
+			arrayBuilder.put(jsonBusinessNameEntry);
 		}
-		return arrayBuilder.build();
+		return arrayBuilder;
 	}
 	
-	protected void addCodedSequenceItemPropertyFromBusinessName(JsonObject businessNamePayload,AttributeList csilist,AttributeTag tag,String reservedKeywordInBusinessNamesFile) {
-		JsonString js = (JsonString)(businessNamePayload.get(reservedKeywordInBusinessNamesFile));
-		if (js != null) {
-			String s = js.getString();
-			if (s != null && s.length() > 0) {
-				try {
-					Attribute a = AttributeFactory.newAttribute(tag);
-					a.addValue(s);
-					csilist.put(a);
-				}
-				catch (DicomException e) {
-					slf4jlogger.error("addCodedSequenceItemPropertyFromBusinessName(): Failed to construct CodedSequenceItem AttributeList Attribute for {} from {} with value {}: {}",tag,reservedKeywordInBusinessNamesFile,s,e);
-				}
+	protected void addCodedSequenceItemPropertyFromBusinessName(JSONObject businessNamePayload, AttributeList csilist, AttributeTag tag, String reservedKeywordInBusinessNamesFile) {
+		String js = businessNamePayload.optString(reservedKeywordInBusinessNamesFile);
+		if (js != null && !js.isEmpty()) {
+			try {
+				Attribute a = AttributeFactory.newAttribute(tag);
+				a.addValue(js);
+				csilist.put(a);
+			} catch (DicomException e) {
+				LOG.error("addCodedSequenceItemPropertyFromBusinessName(): Failed to construct CodedSequenceItem AttributeList Attribute for {} from {} with value {}: {}",tag,reservedKeywordInBusinessNamesFile, js,e);
 			}
 		}
 	}
@@ -309,45 +295,42 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 * @param		document		the JSON document
 	 * @throws	DicomException
 	 */
-	public void loadBusinessNamesDocument(JsonArray document) throws DicomException {
-		for (int i=0; i<document.size(); ++i) {
+	public void loadBusinessNamesDocument(JSONArray document) throws DicomException {
+		for (int i=0; i<document.length(); ++i) {
 			try {
-				JsonObject businessNameEntry = document.getJsonObject(i);
+				JSONObject businessNameEntry = document.getJSONObject(i);
 				if (businessNameEntry != null ) {
 					// should be, e.g. {"SpecificImageFindings":{"_cv":"999000","_csd":"LNdemo","_cm":"Specific Image Findings"}}
 					String businessName = businessNameEntry.keySet().iterator().next();
 					if (businessName != null && businessName.length() > 0) {
 						try {
-							JsonObject businessNamePayload = (JsonObject)(businessNameEntry.get(businessName));
+							JSONObject businessNamePayload = businessNameEntry.getJSONObject(businessName);
 							try {
-								JsonString jsonCodeValue = (JsonString)(businessNamePayload.get(reservedKeywordForCodeValueInBusinessNamesFile));
-								if (jsonCodeValue != null) {
+								String cv = businessNamePayload.optString(reservedKeywordForCodeValueInBusinessNamesFile);
+								if (cv != null) {
 									// business name is a coded concept tuple
-									String cv = jsonCodeValue.getString();
 									String csd = null;
 									String cm = null;
 									{
-										JsonString jsonCodingSchemeDesignator = (JsonString)(businessNamePayload.get(reservedKeywordForCodingSchemeDesignatorInBusinessNamesFile));
+										String jsonCodingSchemeDesignator = businessNamePayload.optString(reservedKeywordForCodingSchemeDesignatorInBusinessNamesFile);
 										if (jsonCodingSchemeDesignator != null) {
-											csd = jsonCodingSchemeDesignator.getString();
+											csd = jsonCodingSchemeDesignator;
 										}
 										else {
 											throw new DicomException("Missing "+reservedKeywordForCodingSchemeDesignatorInBusinessNamesFile+" for code "+cv+" for business name "+businessName);
 										}
 									}
 									{
-										JsonString jsonCodeMeaning = (JsonString)(businessNamePayload.get(reservedKeywordForCodeMeaningInBusinessNamesFile));
+										String jsonCodeMeaning = businessNamePayload.optString(reservedKeywordForCodeMeaningInBusinessNamesFile);
 										if (jsonCodeMeaning != null) {
-											cm = jsonCodeMeaning.getString();
+											cm = jsonCodeMeaning;
 										}
 										else {
 											throw new DicomException("Missing "+reservedKeywordForCodeMeaningInBusinessNamesFile+" for code "+cv+" for business name "+businessName);
 										}
 									}
 
-									if (cv != null && cv.length() > 0
-										&& csd != null && csd.length() > 0
-										&& cm != null && cm.length() > 0
+									if (!cv.isEmpty() && !csd.isEmpty() && !cm.isEmpty()
 									) {
 										CodedSequenceItem csi = new CodedSequenceItem(cv,csd,cm);
 										AttributeList csilist = csi.getAttributeList();
@@ -364,7 +347,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 										addCodedSequenceItemPropertyFromBusinessName(businessNamePayload,csilist,DicomDictionary.StandardDictionary.getTagFromName("ContextGroupLocalVersion"),reservedKeywordForContextGroupLocalVersionInBusinessNamesFile);
 										addCodedSequenceItemPropertyFromBusinessName(businessNamePayload,csilist,DicomDictionary.StandardDictionary.getTagFromName("ContextGroupExtensionCreatorUID"),reservedKeywordForContextGroupExtensionCreatorUIDInBusinessNamesFile);
 
-										if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("loadBusinessNamesDocument(): Loading JSON business name {} for {}",businessName,csi);
+										if (LOG.isDebugEnabled()) LOG.debug("loadBusinessNamesDocument(): Loading JSON business name {} for {}",businessName,csi);
 										businessNames.put(businessName,csi);
 									}
 									else {
@@ -377,25 +360,20 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 								
 								// extract value and relationship type regardless of whether code value is present or not, even though probably not usable in that case
 								try {
-									JsonArray jsonValueTypes = (JsonArray)(businessNamePayload.get(reservedKeywordForValueTypeInBusinessNamesFile));
+									JSONArray jsonValueTypes = businessNamePayload.optJSONArray(reservedKeywordForValueTypeInBusinessNamesFile);
 									if (jsonValueTypes != null) {
-										for (int j=0; j<jsonValueTypes.size(); ++j) {
-											JsonValue jsonValueTypeObject = jsonValueTypes.get(j);
+										for (int j=0; j<jsonValueTypes.length(); ++j) {
 											try {
-												String valueType = ((JsonString)jsonValueTypeObject).getString();
-												if (valueType != null && valueType.length() > 0) {
-													SortedSet<String> valueTypes = valueTypesByBusinessName.get(businessName);
-													if (valueTypes == null) {
-														valueTypes = new TreeSet<String>();
-														valueTypesByBusinessName.put(businessName,valueTypes);
-													}
-													valueTypes.add(valueType);
+												String valueType = jsonValueTypes.getString(j);
+												if (valueType != null && !valueType.isEmpty()) {
+                                                    SortedSet<String> valueTypes = valueTypesByBusinessName.computeIfAbsent(businessName, k -> new TreeSet<String>());
+                                                    valueTypes.add(valueType);
 												}
 												else {
 													throw new DicomException("Empty or missing value type for business name "+businessName);
 												}
 											}
-											catch (ClassCastException e) {
+											catch (JSONException e) {
 												throw new DicomException("String value type required in array for business name "+businessName);
 											}
 										}
@@ -407,25 +385,20 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 								}
 
 								try {
-									JsonArray jsonRelationshipTypes = (JsonArray)(businessNamePayload.get(reservedKeywordForRelationshipTypeInBusinessNamesFile));
+									JSONArray jsonRelationshipTypes = businessNamePayload.optJSONArray(reservedKeywordForRelationshipTypeInBusinessNamesFile);
 									if (jsonRelationshipTypes != null) {
-										for (int j=0; j<jsonRelationshipTypes.size(); ++j) {
-											JsonValue jsonRelationshipTypeObject = jsonRelationshipTypes.get(j);
+										for (int j=0; j<jsonRelationshipTypes.length(); ++j) {
 											try {
-												String relationshipType = ((JsonString)jsonRelationshipTypeObject).getString();
-												if (relationshipType != null && relationshipType.length() > 0) {
-													SortedSet<String> relationshipTypes = relationshipTypesByBusinessName.get(businessName);
-													if (relationshipTypes == null) {
-														relationshipTypes = new TreeSet<String>();
-														relationshipTypesByBusinessName.put(businessName,relationshipTypes);
-													}
-													relationshipTypes.add(relationshipType);
+												String relationshipType = jsonRelationshipTypes.getString(j);
+												if (relationshipType != null && !relationshipType.isEmpty()) {
+                                                    SortedSet<String> relationshipTypes = relationshipTypesByBusinessName.computeIfAbsent(businessName, k -> new TreeSet<String>());
+                                                    relationshipTypes.add(relationshipType);
 												}
 												else {
 													throw new DicomException("Empty or missing relationship type for business name "+businessName);
 												}
 											}
-											catch (ClassCastException e) {
+											catch (JSONException e) {
 												throw new DicomException("String relationship type required in array for business name "+businessName);
 											}
 										}
@@ -466,9 +439,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 * @throws	DicomException
 	 */
 	public void loadBusinessNamesDocument(InputStream stream) throws IOException, DicomException {
-		JsonReader jsonReader = Json.createReader(stream);
-		JsonArray document = jsonReader.readArray();
-		jsonReader.close();
+		JSONArray document = new JSONArray(stream);
 		loadBusinessNamesDocument(document);
 	}
 	
@@ -524,7 +495,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 					if (simplifiedLabel == null) {
 						simplifiedLabel = simplifiedLabelPrefix + Integer.toString(++simplifiedLabelCounter);
 						simplifiedLabelByReferencedContentItemIdentifiers.put(referencedContentItemIdentifier,simplifiedLabel);
-						slf4jlogger.debug("walkTreeBuildingSimplifiedLabelsForReferencedContentItemIdentifierswalkTreeBuildingSimplifiedLabelsForReferencedContentItemIdentifiers(): reference to {} is assigned simplified label {}",referencedContentItemIdentifier,simplifiedLabel);
+						LOG.debug("walkTreeBuildingSimplifiedLabelsForReferencedContentItemIdentifierswalkTreeBuildingSimplifiedLabelsForReferencedContentItemIdentifiers(): reference to {} is assigned simplified label {}",referencedContentItemIdentifier,simplifiedLabel);
 					}
 				}
 			}
@@ -538,11 +509,11 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 * @param	parentObject	the JSON object to add to
 	 * @throws	DicomException
 	 */
-	private void addContentItemAndChildrenToJsonObject(ContentItem contentItem,JsonObjectBuilder parentObject) throws DicomException {
+	private void addContentItemAndChildrenToJsonObject(ContentItem contentItem,JSONObject parentObject) throws DicomException {
 		if (contentItem != null) {
 			int nChildren = contentItem.getChildCount();
 
-			JsonArrayBuilder valuesAndChildren = null;		// lazy instantiation to allow for  when not needed due to special case of single string
+			JSONArray valuesAndChildren = null;		// lazy instantiation to allow for  when not needed due to special case of single string
 			String leafValue = null;
 			
 			String valueType = contentItem.getValueType();
@@ -567,7 +538,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 			
 			CodedSequenceItem conceptName = contentItem.getConceptName();
 			String businessName = makeBusinessNameFromCodeMeaning(conceptName);
-			if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): businessName is {} for conceptName {}",businessName,conceptName);
+			if (LOG.isDebugEnabled()) LOG.debug("addContentItemAndChildrenToJsonObject(): businessName is {} for conceptName {}",businessName,conceptName);
 			// OK for conceptName to be missing ... this is a so-called anonymous content item, e.g., as is often the case for IMAGE value type
 			if (conceptName != null && businessName != null && businessName.length() > 0) {
 				businessNames.put(businessName,conceptName);
@@ -588,37 +559,35 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 				}
 				relationshipTypes.add(relationshipType);
 			}
-			
-			JsonObjectBuilder contentItemAttributesObject = null;	// flag that it is not needed, lazy instantiation
+
+			JSONObject contentItemAttributesObject = null;	// flag that it is not needed, lazy instantiation
 
 			String contentItemIdentifier = contentItemIdentifiersByContentItem.get(contentItem);
-			slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): contentItemIdentifier {} for businessName {}",contentItemIdentifier,businessName);
+			LOG.debug("addContentItemAndChildrenToJsonObject(): contentItemIdentifier {} for businessName {}",contentItemIdentifier,businessName);
 			{
 				String simplifiedLabel = simplifiedLabelByReferencedContentItemIdentifiers.get(contentItemIdentifier);
-				slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): contentItemIdentifier {} has simplifiedLabel {}",contentItemIdentifier,simplifiedLabel);
+				LOG.debug("addContentItemAndChildrenToJsonObject(): contentItemIdentifier {} has simplifiedLabel {}",contentItemIdentifier,simplifiedLabel);
 				if (simplifiedLabel != null) {
-					if (contentItemAttributesObject == null) {
-						contentItemAttributesObject = factory.createObjectBuilder();
-					}
-					contentItemAttributesObject.add(reservedKeywordForSimplifiedLabelAttributeInSRFile,simplifiedLabel);
+                    contentItemAttributesObject = new JSONObject();
+                    contentItemAttributesObject.put(reservedKeywordForSimplifiedLabelAttributeInSRFile,simplifiedLabel);
 				}
 			}
 			
 			{
 				String observationDateTime = contentItem.getObservationDateTime();
 				String observationUID = contentItem.getObservationUID();
-				if ((observationDateTime != null && observationDateTime.length() > 0)
-				 || (observationUID != null && observationUID.length() > 0)
+				if ((observationDateTime != null && !observationDateTime.isEmpty())
+				 || (observationUID != null && !observationUID.isEmpty())
 				) {
-					slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): adding generic contentItemAttributesObject to {}",contentItemIdentifier);
+					LOG.debug("addContentItemAndChildrenToJsonObject(): adding generic contentItemAttributesObject to {}",contentItemIdentifier);
 					if (contentItemAttributesObject == null) {
-						contentItemAttributesObject = factory.createObjectBuilder();
+						contentItemAttributesObject = new JSONObject();
 					}
-					if (observationDateTime != null && observationDateTime.length() > 0) {
-						contentItemAttributesObject.add(reservedKeywordForObservationDateTimeAttributeInSRFile,observationDateTime);
+					if (observationDateTime != null && !observationDateTime.isEmpty()) {
+						contentItemAttributesObject.put(reservedKeywordForObservationDateTimeAttributeInSRFile,observationDateTime);
 					}
-					if (observationUID != null && observationUID.length() > 0) {
-						contentItemAttributesObject.add(reservedKeywordForObservationUIDAttributeInSRFile,observationUID);
+					if (observationUID != null && !observationUID.isEmpty()) {
+						contentItemAttributesObject.put(reservedKeywordForObservationUIDAttributeInSRFile,observationUID);
 					}
 				}
 			}
@@ -627,46 +596,46 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 				String continuityOfContent = ((ContentItemFactory.ContainerContentItem)contentItem).getContinuityOfContent();
 				String templateMappingResource = ((ContentItemFactory.ContainerContentItem)contentItem).getTemplateMappingResource();
 				String templateIdentifier = ((ContentItemFactory.ContainerContentItem)contentItem).getTemplateIdentifier();
-				if ((continuityOfContent != null && continuityOfContent.length() > 0 && !elideSeparateContinuityOfContent || !continuityOfContent.equals("SEPARATE"))
-				 || (templateMappingResource != null && templateMappingResource.length() > 0)
-				 || (templateIdentifier != null && templateIdentifier.length() > 0)) {
-					slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): adding Container contentItemAttributesObject to {}",contentItemIdentifier);
+				if ((continuityOfContent != null && !continuityOfContent.isEmpty() && !elideSeparateContinuityOfContent || !"SEPARATE".equals(continuityOfContent))
+				 || (templateMappingResource != null && !templateMappingResource.isEmpty())
+				 || (templateIdentifier != null && !templateIdentifier.isEmpty())) {
+					LOG.debug("addContentItemAndChildrenToJsonObject(): adding Container contentItemAttributesObject to {}",contentItemIdentifier);
 					if (contentItemAttributesObject == null) {
-						contentItemAttributesObject = factory.createObjectBuilder();
+						contentItemAttributesObject = new JSONObject();
 					}
-					if (continuityOfContent != null && continuityOfContent.length() > 0 && !elideSeparateContinuityOfContent || !continuityOfContent.equals("SEPARATE")) {
-						contentItemAttributesObject.add(reservedKeywordForContinuityOfContentAttributeInSRFile,continuityOfContent);
+					if (!continuityOfContent.isEmpty() && !elideSeparateContinuityOfContent || !continuityOfContent.equals("SEPARATE")) {
+						contentItemAttributesObject.put(reservedKeywordForContinuityOfContentAttributeInSRFile,continuityOfContent);
 					}
-					if (templateMappingResource != null && templateMappingResource.length() > 0) {
-						contentItemAttributesObject.add(reservedKeywordForTemplateMappingResourceAttributeInSRFile,templateMappingResource);
+					if (templateMappingResource != null && !templateMappingResource.isEmpty()) {
+						contentItemAttributesObject.put(reservedKeywordForTemplateMappingResourceAttributeInSRFile,templateMappingResource);
 					}
-					if (templateIdentifier != null && templateIdentifier.length() > 0) {
-						contentItemAttributesObject.add(reservedKeywordForTemplateIdentifierAttributeInSRFile,templateIdentifier);
+					if (templateIdentifier != null && !templateIdentifier.isEmpty()) {
+						contentItemAttributesObject.put(reservedKeywordForTemplateIdentifierAttributeInSRFile,templateIdentifier);
 					}
 				}
 				if (contentItemAttributesObject != null) {
-					if (valuesAndChildren == null) valuesAndChildren = factory.createArrayBuilder();
-					valuesAndChildren.add(contentItemAttributesObject);
+                    valuesAndChildren = new JSONArray();
+					valuesAndChildren.put(contentItemAttributesObject);
 				}
 			}
 			else if (contentItem instanceof ContentItemFactory.CodeContentItem) {
 				if (contentItemAttributesObject != null) {
-					if (valuesAndChildren == null) valuesAndChildren = factory.createArrayBuilder();
-					valuesAndChildren.add(contentItemAttributesObject);
+                    valuesAndChildren = new JSONArray();
+					valuesAndChildren.put(contentItemAttributesObject);
 				}
 				CodedSequenceItem conceptCode = ((ContentItemFactory.CodeContentItem)contentItem).getConceptCode();
 				if (conceptCode != null) {
 					String businessNameForConceptCode = makeBusinessNameFromCodeMeaning(conceptCode);
 					if (businessNameForConceptCode != null && businessNameForConceptCode.length() > 0) {
-						if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): businessNameForConceptCode is {} for conceptCode {}",businessNameForConceptCode,conceptCode);
+						if (LOG.isDebugEnabled()) LOG.debug("addContentItemAndChildrenToJsonObject(): businessNameForConceptCode is {} for conceptCode {}",businessNameForConceptCode,conceptCode);
 						businessNames.put(businessNameForConceptCode,conceptCode);
 						// obviously not adding value type and relationship type, since used as value not concept name
 						if (collapseContentTreeArrays && nChildren == 0 && contentItemAttributesObject == null) {
 							leafValue = businessNameForConceptCode;
 						}
 						else {
-							if (valuesAndChildren == null) valuesAndChildren = factory.createArrayBuilder();
-							valuesAndChildren.add(businessNameForConceptCode);
+							if (valuesAndChildren == null) valuesAndChildren = new JSONArray();
+							valuesAndChildren.put(businessNameForConceptCode);
 						}
 					}
 					// else what does it mean not to be able to get a business name ? should be an exception :(
@@ -677,7 +646,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 				
 				// regardless of whether we needed any other attributes of this content item, all COMPOSITE descriptors are encoded as attributes
 				if (contentItemAttributesObject == null) {
-					contentItemAttributesObject = factory.createObjectBuilder();
+					contentItemAttributesObject = new JSONObject();
 				}
 				// don't add to valuesAndChildren ... need to wait until contentItemAttributesObject is fully built
 
@@ -686,24 +655,24 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 					String businessNameForUnitsCode = null;
 					if (unitsCode != null) {
 						businessNameForUnitsCode = makeBusinessNameFromCodeMeaning(unitsCode);
-						if (businessNameForUnitsCode != null && businessNameForUnitsCode.length() > 0) {
-							if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): businessNameForUnitsCode is {} for conceptCode {}",businessNameForUnitsCode,unitsCode);
+						if (businessNameForUnitsCode != null && !businessNameForUnitsCode.isEmpty()) {
+							if (LOG.isDebugEnabled()) LOG.debug("addContentItemAndChildrenToJsonObject(): businessNameForUnitsCode is {} for conceptCode {}",businessNameForUnitsCode,unitsCode);
 							businessNames.put(businessNameForUnitsCode,unitsCode);	// obviously not adding value type and relationship type to businessNames map entry, since used as value not concept name
-							contentItemAttributesObject.add(reservedKeywordForMeasurementUnitsAttributeInNumericContentItem,businessNameForUnitsCode);
+							contentItemAttributesObject.put(reservedKeywordForMeasurementUnitsAttributeInNumericContentItem,businessNameForUnitsCode);
 						}
 					}
 				}
 				
 				if (numericContentItem.hasFloatingPointValue()) {
 					double doubleValue = numericContentItem.getFloatingPointValue();
-					contentItemAttributesObject.add(reservedKeywordForFloatingPointValueAttributeInNumericContentItem,doubleValue);
+					contentItemAttributesObject.put(reservedKeywordForFloatingPointValueAttributeInNumericContentItem,doubleValue);
 				}
 				
 				if (numericContentItem.hasRationalValue()) {
 					int numeratorValue = numericContentItem.getRationalNumeratorValue();
-					contentItemAttributesObject.add(reservedKeywordForRationalNumeratorAttributeInNumericContentItem,numeratorValue);
+					contentItemAttributesObject.put(reservedKeywordForRationalNumeratorAttributeInNumericContentItem,numeratorValue);
 					long denominatorValue = numericContentItem.getRationalDenominatorValue();
-					contentItemAttributesObject.add(reservedKeywordForRationalDenominatorAttributeInNumericContentItem,denominatorValue);
+					contentItemAttributesObject.put(reservedKeywordForRationalDenominatorAttributeInNumericContentItem,denominatorValue);
 				}
 				
 				{
@@ -711,36 +680,34 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 					if (qualifierCode != null) {
 						String businessNameForQualifierCode = makeBusinessNameFromCodeMeaning(qualifierCode);
 						if (businessNameForQualifierCode != null && businessNameForQualifierCode.length() > 0) {
-							if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): businessNameForQualifierCode is {} for conceptCode {}",businessNameForQualifierCode,qualifierCode);
+							if (LOG.isDebugEnabled()) LOG.debug("addContentItemAndChildrenToJsonObject(): businessNameForQualifierCode is {} for conceptCode {}",businessNameForQualifierCode,qualifierCode);
 							businessNames.put(businessNameForQualifierCode,qualifierCode);	// obviously not adding value type and relationship type to businessNames map entry
-							contentItemAttributesObject.add(reservedKeywordForNumericValueQualifierAttributeInNumericContentItem,businessNameForQualifierCode);
+							contentItemAttributesObject.put(reservedKeywordForNumericValueQualifierAttributeInNumericContentItem,businessNameForQualifierCode);
 						}
 					}
 				}
 
 				// do this now, after contentItemAttributesObject has been built but before we add the value
-				if (valuesAndChildren == null) valuesAndChildren = factory.createArrayBuilder();
-				valuesAndChildren.add(contentItemAttributesObject);
+                valuesAndChildren = new JSONArray();
+				valuesAndChildren.put(contentItemAttributesObject);
 
 				{
 					if (useNumberForNumericContentItemValue) {
 						if (numericContentItem.hasFloatingPointValue()) {
 							double doubleValue = numericContentItem.getFloatingPointValue();
-							slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): useNumberForNumericContentItemValue: adding getFloatingPointValue() numeric value {} for businessName {}",doubleValue,businessName);
-							if (valuesAndChildren == null) valuesAndChildren = factory.createArrayBuilder();
-							valuesAndChildren.add(doubleValue);
+							LOG.debug("addContentItemAndChildrenToJsonObject(): useNumberForNumericContentItemValue: adding getFloatingPointValue() numeric value {} for businessName {}",doubleValue,businessName);
+                            valuesAndChildren.put(doubleValue);
 						}
 						else {
 							String stringValue = numericContentItem.getNumericValue();
 							if (stringValue != null && stringValue.length() > 0) {
 								try {
 									double doubleValue = Double.parseDouble(stringValue);
-									slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): useNumberForNumericContentItemValue: adding Double.parseDouble() numeric value {} from decimal string {} for businessName {}",doubleValue,stringValue,businessName);
-									if (valuesAndChildren == null) valuesAndChildren = factory.createArrayBuilder();
-									valuesAndChildren.add(doubleValue);
+									LOG.debug("addContentItemAndChildrenToJsonObject(): useNumberForNumericContentItemValue: adding Double.parseDouble() numeric value {} from decimal string {} for businessName {}",doubleValue,stringValue,businessName);
+                                    valuesAndChildren.put(doubleValue);
 								}
 								catch (NumberFormatException e) {
-									slf4jlogger.error("addContentItemAndChildrenToJsonObject(): numeric value {} is not valid decimal string for businessName {}",stringValue,businessName);
+									LOG.error("addContentItemAndChildrenToJsonObject(): numeric value {} is not valid decimal string for businessName {}",stringValue,businessName);
 								}
 							}
 						}
@@ -748,8 +715,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 					else {
 						String value = numericContentItem.getNumericValue();
 						if (value != null && value.length() > 0) {
-							if (valuesAndChildren == null) valuesAndChildren = factory.createArrayBuilder();
-							valuesAndChildren.add(value);
+                            valuesAndChildren.put(value);
 						}
 					}
 				}
@@ -762,7 +728,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 				if (value != null && value.length() > 0) {
 					// regardless of whether we needed any other attributes of this content item, all PNAME entries are encoded as attributes
 					if (contentItemAttributesObject == null) {
-						contentItemAttributesObject = factory.createObjectBuilder();
+						contentItemAttributesObject = new JSONObject();
 					}
 					// don't add to valuesAndChildren ... need to wait until contentItemAttributesObject is fully built
 
@@ -773,24 +739,24 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 				}
 				if (contentItemAttributesObject != null) {
 					// do this now, after contentItemAttributesObject has been built but before we add the value
-					if (valuesAndChildren == null) valuesAndChildren = factory.createArrayBuilder();
-					valuesAndChildren.add(contentItemAttributesObject);
+                    valuesAndChildren = new JSONArray();
+					valuesAndChildren.put(contentItemAttributesObject);
 				}
 				// there is no "value" per se
 			}
 			else if (contentItem instanceof ContentItemFactory.StringContentItem) {
 				if (contentItemAttributesObject != null) {
-					if (valuesAndChildren == null) valuesAndChildren = factory.createArrayBuilder();
-					valuesAndChildren.add(contentItemAttributesObject);
+                    valuesAndChildren = new JSONArray();
+					valuesAndChildren.put(contentItemAttributesObject);
 				}
-				String value = ((ContentItemFactory.StringContentItem)contentItem).getConceptValue().trim();	// why do we have to trim()? because sometimes there is trailing padding- why ? :(
-				if (value != null && value.length() > 0) {
+				String value = contentItem.getConceptValue().trim();	// why do we have to trim()? because sometimes there is trailing padding- why ? :(
+				if (!value.isEmpty()) {
 					if (collapseContentTreeArrays && nChildren == 0 && contentItemAttributesObject == null) {
 						leafValue = value;
 					}
 					else {
-						if (valuesAndChildren == null) valuesAndChildren = factory.createArrayBuilder();
-						valuesAndChildren.add(value);
+						if (valuesAndChildren == null) valuesAndChildren =  new JSONArray();
+						valuesAndChildren.put(value);
 					}
 				}
 				// else what does it mean not to be able to get a value ? should be an exception :(
@@ -798,33 +764,33 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 			else if (contentItem instanceof ContentItemFactory.SpatialCoordinatesContentItem) {
 				// regardless of whether we needed any other attributes of this content item, all SCOORD descriptors are encoded as attributes
 				if (contentItemAttributesObject == null) {
-					contentItemAttributesObject = factory.createObjectBuilder();
+					contentItemAttributesObject = new JSONObject();
 				}
 				// don't add to valuesAndChildren ... need to wait until contentItemAttributesObject is fully built
 				
-				String graphicType = ((ContentItemFactory.SpatialCoordinatesContentItem)contentItem).getGraphicType();
+				String graphicType = contentItem.getGraphicType();
 				if (graphicType != null) {	// regardless of whether zero length or not, need node to append data to
-					float[] graphicData = ((ContentItemFactory.SpatialCoordinatesContentItem)contentItem).getGraphicData();
+					float[] graphicData = contentItem.getGraphicData();
 					if (graphicData != null) {
-						JsonArrayBuilder graphicDataArray = factory.createArrayBuilder();
-						for (int i=0; i<graphicData.length; ++i) {
-							graphicDataArray.add((double)graphicData[i]);
-						}
-						contentItemAttributesObject.add(reservedKeywordForGraphicTypeAttributeInCoordinatesContentItem,graphicType);
-						contentItemAttributesObject.add(reservedKeywordFor2DCoordinatesAttributeInCoordinatesContentItem,graphicDataArray);
+						JSONArray graphicDataArray =  new JSONArray();
+                        for (float graphicDatum : graphicData) {
+                            graphicDataArray.put((double) graphicDatum);
+                        }
+						contentItemAttributesObject.put(reservedKeywordForGraphicTypeAttributeInCoordinatesContentItem,graphicType);
+						contentItemAttributesObject.put(reservedKeywordFor2DCoordinatesAttributeInCoordinatesContentItem,graphicDataArray);
 						
 						// need to add pixel origin and fiducial UID when supported by ContentItemFactory.SpatialCoordinatesContentItem (001182) :(
 					}
 				}
 
 				// do this now, after contentItemAttributesObject has been built
-				if (valuesAndChildren == null) valuesAndChildren = factory.createArrayBuilder();
-				valuesAndChildren.add(contentItemAttributesObject);
+                valuesAndChildren = new JSONArray();
+				valuesAndChildren.put(contentItemAttributesObject);
 			}
 			else if (contentItem instanceof ContentItemFactory.SpatialCoordinates3DContentItem) {
 				// regardless of whether we needed any other attributes of this content item, all SCOORD3D descriptors are encoded as attributes
 				if (contentItemAttributesObject == null) {
-					contentItemAttributesObject = factory.createObjectBuilder();
+					contentItemAttributesObject = new JSONObject();
 				}
 				// don't add to valuesAndChildren ... need to wait until contentItemAttributesObject is fully built
 				
@@ -832,95 +798,95 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 				if (graphicType != null) {	// regardless of whether zero length or not, need node to append data to
 					float[] graphicData = ((ContentItemFactory.SpatialCoordinates3DContentItem)contentItem).getGraphicData();
 					if (graphicData != null) {
-						JsonArrayBuilder graphicDataArray = factory.createArrayBuilder();
-						for (int i=0; i<graphicData.length; ++i) {
-							graphicDataArray.add((double)graphicData[i]);
-						}
+						JSONArray graphicDataArray = new JSONArray();
+                        for (float graphicDatum : graphicData) {
+                            graphicDataArray.put((double) graphicDatum);
+                        }
 						String referencedFrameOfReferenceUID = ((ContentItemFactory.SpatialCoordinates3DContentItem)contentItem).getReferencedFrameOfReferenceUID();
 
-						contentItemAttributesObject.add(reservedKeywordForGraphicTypeAttributeInCoordinatesContentItem,graphicType);
-						contentItemAttributesObject.add(reservedKeywordFor3DCoordinatesAttributeInCoordinatesContentItem,graphicDataArray);
-						contentItemAttributesObject.add(reservedKeywordForReferencedFrameOfReferenceUIDAttributeInCoordinatesContentItem,referencedFrameOfReferenceUID);
+						contentItemAttributesObject.put(reservedKeywordForGraphicTypeAttributeInCoordinatesContentItem,graphicType);
+						contentItemAttributesObject.put(reservedKeywordFor3DCoordinatesAttributeInCoordinatesContentItem,graphicDataArray);
+						contentItemAttributesObject.put(reservedKeywordForReferencedFrameOfReferenceUIDAttributeInCoordinatesContentItem,referencedFrameOfReferenceUID);
 
 						// need to add pixel origin and fiducial UID when supported by ContentItemFactory.SpatialCoordinatesContentItem (001182) :(
 					}
 				}
 
 				// do this now, after contentItemAttributesObject has been built
-				if (valuesAndChildren == null) valuesAndChildren = factory.createArrayBuilder();
-				valuesAndChildren.add(contentItemAttributesObject);
+                valuesAndChildren = new JSONArray();
+				valuesAndChildren.put(contentItemAttributesObject);
 			}
 			//ContentItemFactory.TemporalCoordinatesContentItem
 			else if (contentItem instanceof ContentItemFactory.CompositeContentItem) {
 				// regardless of whether we needed any other attributes of this content item, all COMPOSITE descriptors are encoded as attributes
 				if (contentItemAttributesObject == null) {
-					contentItemAttributesObject = factory.createObjectBuilder();
+					contentItemAttributesObject = new JSONObject();
 				}
 				// don't add to valuesAndChildren ... need to wait until contentItemAttributesObject is fully built
 				
-				String referencedSOPClassUID = ((ContentItemFactory.CompositeContentItem)contentItem).getReferencedSOPClassUID();
+				String referencedSOPClassUID = contentItem.getReferencedSOPClassUID();
 				referencedSOPClassUID = JSONRepresentationOfDicomObjectFactory.substituteKeywordForUIDIfPossibleAndRequested(referencedSOPClassUID,substituteUIDKeywords);
-				String referencedSOPInstanceUID = ((ContentItemFactory.CompositeContentItem)contentItem).getReferencedSOPInstanceUID();
+				String referencedSOPInstanceUID = contentItem.getReferencedSOPInstanceUID();
 				if (referencedSOPClassUID != null && referencedSOPClassUID.length() > 0) {
-					contentItemAttributesObject.add(reservedKeywordForReferencedSOPClassUIDAttributeInCompositeContentItem,referencedSOPClassUID);
+					contentItemAttributesObject.put(reservedKeywordForReferencedSOPClassUIDAttributeInCompositeContentItem,referencedSOPClassUID);
 				}
 				else {
-					slf4jlogger.error("addContentItemAndChildrenToJsonObject(): composite family content item missing or empty ReferencedSOPClassUID");
+					LOG.error("addContentItemAndChildrenToJsonObject(): composite family content item missing or empty ReferencedSOPClassUID");
 				}
 				if (referencedSOPInstanceUID != null && referencedSOPInstanceUID.length() > 0) {
-					contentItemAttributesObject.add(reservedKeywordForReferencedSOPInstanceUIDAttributeInCompositeContentItem,referencedSOPInstanceUID);
+					contentItemAttributesObject.put(reservedKeywordForReferencedSOPInstanceUIDAttributeInCompositeContentItem,referencedSOPInstanceUID);
 				}
 				else {
-					slf4jlogger.error("addContentItemAndChildrenToJsonObject(): composite family content item missing or empty ReferencedSOPClassUID");
+					LOG.error("addContentItemAndChildrenToJsonObject(): composite family content item missing or empty ReferencedSOPClassUID");
 				}
 				{
 					if (contentItem instanceof ContentItemFactory.ImageContentItem) {
 						ContentItemFactory.ImageContentItem imageContentItem = (ContentItemFactory.ImageContentItem)contentItem;
 						// need to handle multiple values as array (001181) :(
 						int referencedFrameNumber = imageContentItem.getReferencedFrameNumber();
-						slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): IMAGE content item referencedFrameNumber {}",referencedFrameNumber);
+						LOG.debug("addContentItemAndChildrenToJsonObject(): IMAGE content item referencedFrameNumber {}",referencedFrameNumber);
 						if (referencedFrameNumber != 0) {
-							contentItemAttributesObject.add(reservedKeywordForReferencedFrameNumberAttributeInCompositeContentItem,referencedFrameNumber);
+							contentItemAttributesObject.put(reservedKeywordForReferencedFrameNumberAttributeInCompositeContentItem,referencedFrameNumber);
 						}
 						
 						int referencedSegmentNumber = imageContentItem.getReferencedSegmentNumber();
-						slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): IMAGE content item referencedSegmentNumber {}",referencedSegmentNumber);
+						LOG.debug("addContentItemAndChildrenToJsonObject(): IMAGE content item referencedSegmentNumber {}",referencedSegmentNumber);
 						if (referencedSegmentNumber != 0) {
-							contentItemAttributesObject.add(reservedKeywordForReferencedSegmentNumberAttributeInCompositeContentItem,referencedSegmentNumber);
+							contentItemAttributesObject.put(reservedKeywordForReferencedSegmentNumberAttributeInCompositeContentItem,referencedSegmentNumber);
 						}
 
 						String presentationStateSOPClassUID = imageContentItem.getPresentationStateSOPClassUID();
 						presentationStateSOPClassUID = JSONRepresentationOfDicomObjectFactory.substituteKeywordForUIDIfPossibleAndRequested(presentationStateSOPClassUID,substituteUIDKeywords);
-						slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): IMAGE content item presentationStateSOPClassUID {}",presentationStateSOPClassUID);
+						LOG.debug("addContentItemAndChildrenToJsonObject(): IMAGE content item presentationStateSOPClassUID {}",presentationStateSOPClassUID);
 						if (presentationStateSOPClassUID != null && presentationStateSOPClassUID.length() > 0) {
-							contentItemAttributesObject.add(reservedKeywordForPresentationStateSOPClassUIDAttributeInCompositeContentItem,presentationStateSOPClassUID);
+							contentItemAttributesObject.put(reservedKeywordForPresentationStateSOPClassUIDAttributeInCompositeContentItem,presentationStateSOPClassUID);
 						}
 				
 						String presentationStateSOPInstanceUID = imageContentItem.getPresentationStateSOPInstanceUID();
-						slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): IMAGE content item presentationStateSOPInstanceUID {}",presentationStateSOPInstanceUID);
+						LOG.debug("addContentItemAndChildrenToJsonObject(): IMAGE content item presentationStateSOPInstanceUID {}",presentationStateSOPInstanceUID);
 						if (presentationStateSOPInstanceUID != null && presentationStateSOPInstanceUID.length() > 0) {
-							contentItemAttributesObject.add(reservedKeywordForPresentationStateSOPInstanceUIDAttributeInCompositeContentItem,presentationStateSOPInstanceUID);
+							contentItemAttributesObject.put(reservedKeywordForPresentationStateSOPInstanceUIDAttributeInCompositeContentItem,presentationStateSOPInstanceUID);
 						}
 						// should check if one is present, both are :(
 
 						String realWorldValueMappingSOPClassUID = imageContentItem.getRealWorldValueMappingSOPClassUID();
 						realWorldValueMappingSOPClassUID = JSONRepresentationOfDicomObjectFactory.substituteKeywordForUIDIfPossibleAndRequested(realWorldValueMappingSOPClassUID,substituteUIDKeywords);
-						slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): IMAGE content item realWorldValueMappingSOPClassUID {}",realWorldValueMappingSOPClassUID);
+						LOG.debug("addContentItemAndChildrenToJsonObject(): IMAGE content item realWorldValueMappingSOPClassUID {}",realWorldValueMappingSOPClassUID);
 						if (realWorldValueMappingSOPClassUID != null && realWorldValueMappingSOPClassUID.length() > 0) {
-							contentItemAttributesObject.add(reservedKeywordForRealWorldValueMappingSOPClassUIDAttributeInCompositeContentItem,realWorldValueMappingSOPClassUID);
+							contentItemAttributesObject.put(reservedKeywordForRealWorldValueMappingSOPClassUIDAttributeInCompositeContentItem,realWorldValueMappingSOPClassUID);
 						}
 
 						String realWorldValueMappingSOPInstanceUID = imageContentItem.getRealWorldValueMappingSOPInstanceUID();
-						slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): IMAGE content item realWorldValueMappingSOPInstanceUID {}",realWorldValueMappingSOPInstanceUID);
+						LOG.debug("addContentItemAndChildrenToJsonObject(): IMAGE content item realWorldValueMappingSOPInstanceUID {}",realWorldValueMappingSOPInstanceUID);
 						if (realWorldValueMappingSOPInstanceUID != null && realWorldValueMappingSOPInstanceUID.length() > 0) {
-							contentItemAttributesObject.add(reservedKeywordForRealWorldValueMappingSOPInstanceUIDAttributeInCompositeContentItem,realWorldValueMappingSOPInstanceUID);
+							contentItemAttributesObject.put(reservedKeywordForRealWorldValueMappingSOPInstanceUIDAttributeInCompositeContentItem,realWorldValueMappingSOPInstanceUID);
 						}
 						// should check if one is present, both are :(
 					}
 				}
 				// do this now, after contentItemAttributesObject has been built
-				if (valuesAndChildren == null) valuesAndChildren = factory.createArrayBuilder();
-				valuesAndChildren.add(contentItemAttributesObject);
+				if (valuesAndChildren == null) valuesAndChildren = new JSONArray();
+				valuesAndChildren.put(contentItemAttributesObject);
 			}
 			else {
 				// no value type means By-Reference relationship
@@ -929,32 +895,32 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 					String referencedSimplifiedLabel = simplifiedLabelByReferencedContentItemIdentifiers.get(referencedContentItemIdentifier);
 					if (referencedSimplifiedLabel != null && referencedSimplifiedLabel.length() > 0) {
 						if (contentItemAttributesObject == null) {
-							contentItemAttributesObject = factory.createObjectBuilder();
+							contentItemAttributesObject = new JSONObject();
 						}
-						contentItemAttributesObject.add(reservedKeywordForSimplifiedReferenceToLabelAttributeInSRFile,referencedSimplifiedLabel);
+						contentItemAttributesObject.put(reservedKeywordForSimplifiedReferenceToLabelAttributeInSRFile,referencedSimplifiedLabel);
 					}
 					// else should not happen since already walked tree to populate the mapping of contentItemIdentifier to simplifiedLabel for those that are actuallt referenced
 					if (contentItemAttributesObject != null) {
-						if (valuesAndChildren == null) valuesAndChildren = factory.createArrayBuilder();
-						valuesAndChildren.add(contentItemAttributesObject);
+						if (valuesAndChildren == null) valuesAndChildren = new JSONArray();
+						valuesAndChildren.put(contentItemAttributesObject);
 					}
 				}
 				else {
 					//throw new DicomException("Content item value type "+valueType+" conversion to JSON not yet supported");
-					slf4jlogger.debug("addContentItemAndChildrenToJsonObject(): Content item {} value type {} conversion to JSON not yet supported",contentItemIdentifier,valueType);
+					LOG.debug("addContentItemAndChildrenToJsonObject(): Content item {} value type {} conversion to JSON not yet supported",contentItemIdentifier,valueType);
 				}
 			}
 
 			// now handle any children, which must be in array rather than object since concept names may not be unique and order must be preserved
 			if (nChildren > 0) {
-				JsonArrayBuilder children = factory.createArrayBuilder();
+				JSONArray children = new JSONArray();
 				for (int i=0; i<nChildren; ++i) {
-					JsonObjectBuilder child = factory.createObjectBuilder();
+					JSONObject child = new JSONObject();
 					addContentItemAndChildrenToJsonObject((ContentItem)(contentItem.getChildAt(i)),child);
-					children.add(child);
+					children.put(child);
 				}
-				if (valuesAndChildren == null) valuesAndChildren = factory.createArrayBuilder();
-				valuesAndChildren.add(children);
+				if (valuesAndChildren == null) valuesAndChildren = new JSONArray();
+				valuesAndChildren.put(children);
 			}
 			
 			// businessName will already have been set at this point to businessNameToUseForAnonymousContentItems by earlier call to makeBusinessNameFromCodeMeaning()
@@ -963,10 +929,10 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 			//}
 			
 			if (valuesAndChildren != null) {
-				parentObject.add(businessName,valuesAndChildren);	// don't do this until AFTER children have been added or it doesn't work (children are ignored)
+				parentObject.put(businessName,valuesAndChildren);	// don't do this until AFTER children have been added or it doesn't work (children are ignored)
 			}
 			else if (leafValue != null) {
-				parentObject.add(businessName,leafValue);
+				parentObject.put(businessName,leafValue);
 			}
 		}
 		
@@ -977,7 +943,6 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 *
 	 */
 	public JSONRepresentationOfStructuredReportObjectFactory() {
-		factory = Json.createBuilderFactory(null/*config*/);
 	}
 	
 	/**
@@ -988,7 +953,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 * @return						the JSON encoded DICOM SR document
 
 	 */
-	public JsonArray getDocument(AttributeList list) throws DicomException {
+	public JSONArray getDocument(AttributeList list) throws DicomException {
 		return getDocument(null,list);
 	}
 	
@@ -999,7 +964,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 * @exception	DicomException
 	 * @return						the JSON encoded DICOM SR document
 	 */
-	public JsonArray getDocument(StructuredReport sr) throws DicomException {
+	public JSONArray getDocument(StructuredReport sr) throws DicomException {
 		return getDocument(sr,null);
 	}
 	
@@ -1011,14 +976,14 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 * @exception	DicomException
 	 * @return						the JSON encoded DICOM SR document
 	 */
-	public JsonArray getDocument(StructuredReport sr,AttributeList list) throws DicomException {
-		JsonObjectBuilder topLevelObjectBuilder = factory.createObjectBuilder();
+	public JSONArray getDocument(StructuredReport sr,AttributeList list) throws DicomException {
+		JSONObject topLevelObjectBuilder = new JSONObject();
 		if (sr == null) {
 			try {
 				sr = new StructuredReport(list);
 			}
 			catch (DicomException e) {
-				slf4jlogger.error("",e);
+				LOG.error("",e);
 			}
 		}
 		if (list != null) {
@@ -1038,7 +1003,9 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 			walkTreeBuildingSimplifiedLabelsForReferencedContentItemIdentifiers((ContentItem)(sr.getRoot()),"1");
 			addContentItemAndChildrenToJsonObject((ContentItem)(sr.getRoot()),topLevelObjectBuilder);
 		}
-		return factory.createArrayBuilder().add(topLevelObjectBuilder).build();
+		JSONArray array = new JSONArray();
+		array.put(topLevelObjectBuilder);
+		return array;
 	}
 	
 	/**
@@ -1049,7 +1016,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 * @throws	IOException
 	 * @throws	DicomException
 	 */
-	public JsonArray getDocument(File file) throws IOException, DicomException {
+	public JSONArray getDocument(File file) throws IOException, DicomException {
 		AttributeList list = new AttributeList();
 		list.setDecompressPixelData(false);
 		list.read(file);
@@ -1064,125 +1031,112 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 * @throws	IOException
 	 * @throws	DicomException
 	 */
-	public JsonArray getDocument(String filename) throws IOException, DicomException {
+	public JSONArray getDocument(String filename) throws IOException, DicomException {
 		return getDocument(new File(filename));
 	}
 
 	protected ContentItemFactory contentItemFactory;
 	
-	protected String getStringFromSelectedContentItemValue(JsonArray contentItemValues,int which,String what,String valueType,CodedSequenceItem concept) {
-		String value = null;
-		JsonValue entry = contentItemValues.get(which);
-		if (entry != null && entry.getValueType() == JsonValue.ValueType.STRING) {
-			value = ((JsonString)entry).getString();
-			if (value == null || value.length() == 0) {
-				slf4jlogger.error("Missing {} in {} content item for concept {} ",what,valueType,concept);
-			}
-		}
-		else {
-			slf4jlogger.error("Missing {} string in {} content item for concept {} ",what,valueType,concept);
+	protected String getStringFromSelectedContentItemValue(JSONArray contentItemValues,int which,String what,String valueType,CodedSequenceItem concept) {
+		String value = contentItemValues.optString(which);
+		if (value == null || value.isEmpty()) {
+			LOG.error("Missing {} in {} content item for concept {} ",what,valueType,concept);
 		}
 		return value;
 	}
 
 
-	protected String getSingleStringValueOrNullFromJsonStringOrNumberContentItemValue(JsonValue entry,String valueType,CodedSequenceItem concept) {
+	protected String getSingleStringValueOrNullFromJsonStringOrNumberContentItemValue(Object entry,String valueType,CodedSequenceItem concept) {
 		String value = null;
 		if (entry == null) {
-			slf4jlogger.error("Missing value string in {} content item for concept {} ",valueType,concept);
+			LOG.error("Missing value string in {} content item for concept {} ",valueType,concept);
+		}
+		else if (entry instanceof String stringValue) {
+			value = stringValue;
+			if (value.isEmpty()) {
+				LOG.error("Missing or empty string value in {} content item for concept {} ",valueType,concept);
+			}
+		}
+		else if (entry instanceof Number numberValue) {
+			// pattern copied from JSONRepresentationOfDicomObjectFactory.addAttributesFromListToJsonObject() ? refactor :(
+			value = numberValue.toString();			// NB. will add trailing ".0" if an integer value :(
+			if (value.endsWith(".0")) {
+				value =  value.substring(0,value.length()-2);
+			}
 		}
 		else {
-			JsonValue.ValueType jsonValueType = entry.getValueType();
-			if (jsonValueType == JsonValue.ValueType.STRING) {
-				value = ((JsonString)entry).getString();
-				if (value == null || value.length() == 0) {
-					slf4jlogger.error("Missing or empty string value in {} content item for concept {} ",valueType,concept);
-				}
-			}
-			else if (jsonValueType == JsonValue.ValueType.NUMBER) {
-				// pattern copied from JSONRepresentationOfDicomObjectFactory.addAttributesFromListToJsonObject() ? refactor :(
-				value = Double.toString(((JsonNumber)entry).doubleValue());			// NB. will add trailing ".0" if an integer value :(
-				if (value.endsWith(".0")) {
-					value =  value.substring(0,value.length()-2);
-				}
-			}
-			else {
-				slf4jlogger.error("Invalid JsonValue.ValueType {} string in {} content item for concept {} ",valueType,concept);
-			}
+			LOG.error("Invalid JsonValue.ValueType {} string in {} content item for concept {} ",valueType,concept);
 		}
 		return value;
 	}
 
-	protected String getSingleStringValueOrNullFromJsonContentItemValue(JsonValue entry,String valueType,CodedSequenceItem concept) {
+	protected String getSingleStringValueOrNullFromJsonContentItemValue(Object entry,String valueType,CodedSequenceItem concept) {
 		String value = null;
-		if (entry != null && entry.getValueType() == JsonValue.ValueType.STRING) {
-			value = ((JsonString)entry).getString();
-			if (value == null || value.length() == 0) {
-				slf4jlogger.error("Missing or empty string value in {} content item for concept {} ",valueType,concept);
+		if (entry instanceof String stringValue) {
+			value = stringValue;
+			if (value.isEmpty()) {
+				LOG.error("Missing or empty string value in {} content item for concept {} ",valueType,concept);
 			}
-		}
-		else {
-			slf4jlogger.error("Missing or invalid type of value string in {} content item for concept {} ",valueType,concept);
+		} else {
+			LOG.error("Missing or invalid type of value string in {} content item for concept {} ",valueType,concept);
 		}
 		return value;
 	}
 
-	protected boolean haveChildrenForSingleStringOrCodeJsonContentItemValue(JsonValue contentItemValue,JsonObject contentItemAttributesObject) {
-		return contentItemValue != null && contentItemValue.getValueType() == JsonValue.ValueType.ARRAY && ((JsonArray)contentItemValue).size() > (contentItemAttributesObject == null ? 1 : 2);
+	protected boolean haveChildrenForSingleStringOrCodeJsonContentItemValue(Object contentItemValue,JSONObject contentItemAttributesObject) {
+		return contentItemValue instanceof JSONArray && ((JSONArray) contentItemValue).length() > (contentItemAttributesObject == null ? 1 : 2);
 	}
 	
-	protected String determineUnknownValueType(String parentValueType,JsonValue childObjectValue) {
-		slf4jlogger.debug("determineUnknownValueType(): parentValueType {} childObjectValue {}",parentValueType,childObjectValue);
+	protected String determineUnknownValueType(String parentValueType,Object childObjectValue) {
+		LOG.debug("determineUnknownValueType(): parentValueType {} childObjectValue {}",parentValueType,childObjectValue);
 		int firstEntryIndex = -1;
-		if (childObjectValue != null && childObjectValue.getValueType() == JsonValue.ValueType.ARRAY) {
-			JsonArray childValueAndChildrenArray = (JsonArray)childObjectValue;
-			JsonObject contentItemAttributesObject = getContentItemAttributesObject(childValueAndChildrenArray);
+		if (childObjectValue instanceof JSONArray childValueAndChildrenArray) {
+			JSONObject contentItemAttributesObject = getContentItemAttributesObject(childValueAndChildrenArray);
 			if (contentItemAttributesObject != null) {
-				if (childValueAndChildrenArray.size() > 1) {
+				if (childValueAndChildrenArray.length() > 1) {
 					firstEntryIndex = 1;
-					slf4jlogger.debug("determineUnknownValueType(): have attribute object preceding value and children array");
+					LOG.debug("determineUnknownValueType(): have attribute object preceding value and children array");
 				}
 			}
 			else {
 				firstEntryIndex = 0;
-				slf4jlogger.debug("determineUnknownValueType(): no attribute object preceding value and children array");
+				LOG.debug("determineUnknownValueType(): no attribute object preceding value and children array");
 			}
-			slf4jlogger.debug("determineUnknownValueType(): firstEntryIndex {}",firstEntryIndex);
+			LOG.debug("determineUnknownValueType(): firstEntryIndex {}",firstEntryIndex);
 			
 			// regardless of parentValueType
 			if (contentItemAttributesObject != null) {
-				slf4jlogger.debug("determineUnknownValueType(): have attribute object so checking for IMAGE, WAVEFORM, COMPOSITE");
+				LOG.debug("determineUnknownValueType(): have attribute object so checking for IMAGE, WAVEFORM, COMPOSITE");
 				{
-					JsonValue attributeValue = contentItemAttributesObject.get(reservedKeywordForReferencedSOPClassUIDAttributeInCompositeContentItem);
-					if (attributeValue != null && attributeValue.getValueType() == JsonValue.ValueType.STRING) {
-						String referencedSOPClassUID = ((JsonString)attributeValue).getString();
-						slf4jlogger.debug("determineUnknownValueType(): referencedSOPClassUID is {}",referencedSOPClassUID);
-						if (referencedSOPClassUID != null && referencedSOPClassUID.length() > 0) {
+					Object attributeValue = contentItemAttributesObject.opt(reservedKeywordForReferencedSOPClassUIDAttributeInCompositeContentItem);
+					if (attributeValue instanceof String referencedSOPClassUID) {
+						LOG.debug("determineUnknownValueType(): referencedSOPClassUID is {}",referencedSOPClassUID);
+						if (referencedSOPClassUID.length() > 0) {
 							referencedSOPClassUID = JSONRepresentationOfDicomObjectFactory.substituteUIDForKeywordIfPossible(referencedSOPClassUID);
-							slf4jlogger.debug("determineUnknownValueType(): referencedSOPClassUID after key word replacement with UID is {}",referencedSOPClassUID);
+							LOG.debug("determineUnknownValueType(): referencedSOPClassUID after key word replacement with UID is {}",referencedSOPClassUID);
 							if (SOPClass.isImageStorage(referencedSOPClassUID)) {
-								slf4jlogger.debug("determineUnknownValueType(): referencedSOPClassUID is recognized as IMAGE");
+								LOG.debug("determineUnknownValueType(): referencedSOPClassUID is recognized as IMAGE");
 								return "IMAGE";
 							}
 							else if (SOPClass.isWaveform(referencedSOPClassUID)) {
-								slf4jlogger.debug("determineUnknownValueType(): referencedSOPClassUID is recognized as WAVEFORM");
+								LOG.debug("determineUnknownValueType(): referencedSOPClassUID is recognized as WAVEFORM");
 								return "WAVEFORM";
 							}
 							else if (SOPClass.isStorage(referencedSOPClassUID)) {
-								slf4jlogger.debug("determineUnknownValueType(): referencedSOPClassUID is recognized as storage but not image or waveform, so assume COMPOSITE");
+								LOG.debug("determineUnknownValueType(): referencedSOPClassUID is recognized as storage but not image or waveform, so assume COMPOSITE");
 								return "COMPOSITE";
 							}
 						}
 					}
 				}
 				{
-					JsonValue attributeValue = contentItemAttributesObject.get(reservedKeywordFor2DCoordinatesAttributeInCoordinatesContentItem);
+					Object attributeValue = contentItemAttributesObject.opt(reservedKeywordFor2DCoordinatesAttributeInCoordinatesContentItem);
 					if (attributeValue != null) {
 						return "SCOORD";
 					}
 				}
 				{
-					JsonValue attributeValue = contentItemAttributesObject.get(reservedKeywordFor3DCoordinatesAttributeInCoordinatesContentItem);
+					Object attributeValue = contentItemAttributesObject.opt(reservedKeywordFor3DCoordinatesAttributeInCoordinatesContentItem);
 					if (attributeValue != null) {
 						return "SCOORD3D";
 					}
@@ -1193,31 +1147,30 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	}
 	
 	protected static String selectTheOtherOfTwoStringsInSet(String method,String location,Set<String> theSet,String doNotWant) {
-		slf4jlogger.debug("{}(): {}: is not {} so looking for the other choice",method,location,doNotWant);
+		LOG.debug("{}(): {}: is not {} so looking for the other choice",method,location,doNotWant);
 		for (String s : theSet) {
-			slf4jlogger.debug("{}(): {}: checking choice of {}",method,location,s);
+			LOG.debug("{}(): {}: checking choice of {}",method,location,s);
 			if (!s.equals(doNotWant)) {
-				slf4jlogger.debug("{}(): {}: selected other choice than {} is {}",method,location,doNotWant,s);
+				LOG.debug("{}(): {}: selected other choice than {} is {}",method,location,doNotWant,s);
 				return s;
 			}
 		}
 		return null;	// should not happen
 	}
 
-	protected String selectFromAlternativeValueTypesForBusinessName(String childLocation,String childBusinessName,String parentValueType,Set<String> childValueTypes,JsonValue childObjectValue) {
+	protected String selectFromAlternativeValueTypesForBusinessName(String childLocation,String childBusinessName,String parentValueType,Set<String> childValueTypes, Object childObjectValue) {
 		String childValueType = null;
 		if (childValueTypes != null && childValueTypes.size() > 0) {
 			if (childValueTypes.size() == 1) {
 				childValueType = childValueTypes.iterator().next();
 			}
 			else {
-				slf4jlogger.debug("selectFromAlternativeValueTypesForBusinessName(): {}: Ambiguous choice of value types for {} - attempting to disambiguate",childLocation,childBusinessName);
+				LOG.debug("selectFromAlternativeValueTypesForBusinessName(): {}: Ambiguous choice of value types for {} - attempting to disambiguate",childLocation,childBusinessName);
 				if (childValueTypes.size() == 2) {
-					slf4jlogger.debug("selectFromAlternativeValueTypesForBusinessName(): {}: Have two choices",childLocation);
+					LOG.debug("selectFromAlternativeValueTypesForBusinessName(): {}: Have two choices",childLocation);
 					// use case: value type includes CONTAINER and any other value type - assume that if single String value is present for child then it is not a CONTAINER
 					if (childValueTypes.contains("CONTAINER")) {
-						if (childObjectValue != null
-						 && childObjectValue.getValueType() == JsonValue.ValueType.STRING) {
+						if (childObjectValue instanceof String) {
 							childValueType = selectTheOtherOfTwoStringsInSet("selectFromAlternativeValueTypesForBusinessName",childLocation,childValueTypes,"CONTAINER");
 						}
 						else {
@@ -1229,12 +1182,10 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 						  && (childValueTypes.contains("TEXT") || childValueTypes.contains("DATE") || childValueTypes.contains("TIME") || childValueTypes.contains("DATETIME") || childValueTypes.contains("UIDREF"))) {
 						// use case: value type includes CODE and TEXT or similar only - disambiguate based on whether single string value type and not amongst business names
 						// is needed for sr_syngoviamm3dsc.dcm use of (121401,"DCM","Derivation") as both CODE and TEXT (which is quite legal)
-						slf4jlogger.debug("selectFromAlternativeValueTypesForBusinessName(): {}: is CODE or something TEXT-like",childLocation);
-						if (childObjectValue != null
-						 && childObjectValue.getValueType() == JsonValue.ValueType.STRING) {
-							String stringValue = ((JsonString)childObjectValue).getString();
-							slf4jlogger.debug("selectFromAlternativeValueTypesForBusinessName(): {}: have child stringValue of {}",childLocation,stringValue);
-							if (businessNames.keySet().contains(stringValue)) {
+						LOG.debug("selectFromAlternativeValueTypesForBusinessName(): {}: is CODE or something TEXT-like",childLocation);
+						if (childObjectValue instanceof String stringValue) {
+							LOG.debug("selectFromAlternativeValueTypesForBusinessName(): {}: have child stringValue of {}",childLocation,stringValue);
+							if (businessNames.containsKey(stringValue)) {
 								childValueType = "CODE";
 							}
 							else {
@@ -1256,19 +1207,19 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 				childRelationshipType = childRelationshipTypes.iterator().next();
 			}
 			else {
-				slf4jlogger.debug("selectFromAlternativeRelationshipTypesForBusinessName(): {}: Ambiguous choice of relationship types for {} - attempting to disambiguate",childLocation,childBusinessName);
+				LOG.debug("selectFromAlternativeRelationshipTypesForBusinessName(): {}: Ambiguous choice of relationship types for {} - attempting to disambiguate",childLocation,childBusinessName);
 				// use case: two choices available, any child value type of CONTAINER parent used either as CONTAINS or (something other than HAS CONCEPT MOD, HAS ACQ CONTEXT or HAS OBS CONTEXT)
 				// use case: any child value type used either as CONTAINS or HAS PROPERTIES - disambiguate based on CONTAINER parent or not
 				if (childRelationshipTypes.size() == 2) {
-					slf4jlogger.debug("selectFromAlternativeRelationshipTypesForBusinessName(): {}: Have two choices",childLocation);
+					LOG.debug("selectFromAlternativeRelationshipTypesForBusinessName(): {}: Have two choices",childLocation);
 					if (childRelationshipTypes.contains("CONTAINS")
 					 && !childRelationshipTypes.contains("HAS CONCEPT MOD")		// also valid for CONTAINER parent, so can't use parentValueType of CONTAINER to choose
 					 && !childRelationshipTypes.contains("HAS ACQ CONTEXT")		// also valid for CONTAINER parent, so can't use parentValueType of CONTAINER to choose
 					 && !childRelationshipTypes.contains("HAS OBS CONTEXT")		// also valid for CONTAINER parent, so can't use parentValueType of CONTAINER to choose
 					) {
-						slf4jlogger.debug("selectFromAlternativeRelationshipTypesForBusinessName(): {}: Have choice of CONTAINS and one other than AS CONCEPT MOD, HAS ACQ CONTEXT or HAS OBS CONTEXT",childLocation);
+						LOG.debug("selectFromAlternativeRelationshipTypesForBusinessName(): {}: Have choice of CONTAINS and one other than AS CONCEPT MOD, HAS ACQ CONTEXT or HAS OBS CONTEXT",childLocation);
 						if (parentValueType.equals("CONTAINER")) {
-							slf4jlogger.debug("selectFromAlternativeRelationshipTypesForBusinessName(): {}: parent is CONTAINER so use CONTAINS",childLocation);
+							LOG.debug("selectFromAlternativeRelationshipTypesForBusinessName(): {}: parent is CONTAINER so use CONTAINS",childLocation);
 							childRelationshipType = "CONTAINS";
 						}
 						else {
@@ -1282,8 +1233,8 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 		return childRelationshipType;
 	}
 	
-	protected String determineUnknownRelationshipType(String parentValueType,String childValueType,JsonValue childObjectValue) {
-		slf4jlogger.debug("determineUnknownRelationshipType(): parentValueType {} childValueType {}",parentValueType,childValueType);
+	protected String determineUnknownRelationshipType(String parentValueType,String childValueType,Object childObjectValue) {
+		LOG.debug("determineUnknownRelationshipType(): parentValueType {} childValueType {}",parentValueType,childValueType);
 		if (parentValueType.equals("TEXT") || parentValueType.equals("CODE") || parentValueType.equals("NUM")) {	// per PS3.3 Table A.35.3-2. Relationship Content Constraints for Comprehensive SR IOD
 			if ("SCOORD".equals(childValueType)) {	// allow for null, e.g. by reference
 				return "INFERRED FROM";
@@ -1301,57 +1252,57 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	}
 
 	// the attributes that describe a content item (such as label and template ID) are distinguished from the succeeding values and children by being a JSON OBJECT rather than an ARRAY
-	protected JsonObject getContentItemAttributesObject(JsonArray contentItemAttributesAndChildrenArray) {
-		JsonObject contentItemAttributesObject = null;
-		if (contentItemAttributesAndChildrenArray.size() > 0) {
-			JsonValue firstEntryCandidate = contentItemAttributesAndChildrenArray.get(0);
-			if (firstEntryCandidate != null && firstEntryCandidate.getValueType() == JsonValue.ValueType.OBJECT) {
-				contentItemAttributesObject = (JsonObject)firstEntryCandidate;
-				slf4jlogger.debug("getContentItemAttributesObject(): content item has attributes");
+	protected JSONObject getContentItemAttributesObject(JSONArray contentItemAttributesAndChildrenArray) {
+		JSONObject contentItemAttributesObject = null;
+		if (!contentItemAttributesAndChildrenArray.isEmpty()) {
+			Object firstEntryCandidate = contentItemAttributesAndChildrenArray.get(0);
+			if (firstEntryCandidate instanceof JSONObject) {
+				contentItemAttributesObject = (JSONObject)firstEntryCandidate;
+				LOG.debug("getContentItemAttributesObject(): content item has attributes");
 			}
 		}
 		return contentItemAttributesObject;
 	}
 
-	protected Map<String,String> referencedContentItemIdentifiersBySimplifiedLabel = new HashMap<String,String>();
+	protected Map<String,String> referencedContentItemIdentifiersBySimplifiedLabel = new HashMap<>();
 
-	protected ContentItem getContentItemAndChildrenFromJSONObjectValue(String businessName,CodedSequenceItem concept,String valueType,String relationshipType,JsonValue contentItemValue,String location) throws DicomException {
-		slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}:  businessName = {}",location,businessName);
-		if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: concept = {}",location,concept);
+	protected ContentItem getContentItemAndChildrenFromJSONObjectValue(String businessName,CodedSequenceItem concept,String valueType,String relationshipType,Object contentItemValue,String location) throws DicomException {
+		LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}:  businessName = {}",location,businessName);
+		if (LOG.isDebugEnabled()) LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: concept = {}",location,concept);
 		ContentItem contentItem = null;
 		if (contentItemValue != null) {
-			slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: valueType = {}",location,valueType);
-			slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: relationshipType = {}",location,relationshipType);
+			LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: valueType = {}",location,valueType);
+			LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: relationshipType = {}",location,relationshipType);
 			String observationDateTime = null;
 			String observationUID = null;
-			JsonArray contentItemChildren = null;			// as we process each type of SR content item, we will find and populate this, if not a leaf
-			JsonObject contentItemAttributesObject = null;	// may not be any attributes
+			JSONArray contentItemChildren = null;			// as we process each type of SR content item, we will find and populate this, if not a leaf
+			JSONObject contentItemAttributesObject = null;	// may not be any attributes
 			int firstEntryIndex = -1;						// flag that there are no entries
-			JsonValue firstEntryCandidate = null;			// may be empty if container and no value (does not include contentItemAttributesObject, which have already been extracted)
-			JsonArray lastEntryInValueArray = null;			// depending on SR content item value type, this will probably be what we want for contentItemChildren
-			JsonArray contentItemValueAndChildrenArray = null;
-			if (contentItemValue != null && contentItemValue.getValueType() == JsonValue.ValueType.ARRAY) {
-				contentItemValueAndChildrenArray = (JsonArray)contentItemValue;
-				if (contentItemValueAndChildrenArray.size() > 0) {
+			Object firstEntryCandidate = null;			// may be empty if container and no value (does not include contentItemAttributesObject, which have already been extracted)
+			JSONArray lastEntryInValueArray = null;			// depending on SR content item value type, this will probably be what we want for contentItemChildren
+			JSONArray contentItemValueAndChildrenArray = null;
+			if (contentItemValue instanceof JSONArray) {
+				contentItemValueAndChildrenArray = (JSONArray)contentItemValue;
+				if (!contentItemValueAndChildrenArray.isEmpty()) {
 					contentItemAttributesObject = getContentItemAttributesObject(contentItemValueAndChildrenArray);
 					if (contentItemAttributesObject != null) {
-						if (contentItemValueAndChildrenArray.size() > 1) {
+						if (contentItemValueAndChildrenArray.length() > 1) {
 							firstEntryIndex = 1;
-							slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: have attribute object preceding value and children array",location);
+							LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: have attribute object preceding value and children array",location);
 						}
 					}
 					else {
 						firstEntryIndex = 0;
-						slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: no attribute object preceding value and children array",location);
+						LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: no attribute object preceding value and children array",location);
 					}
 					if (firstEntryIndex >= 0) {
 						firstEntryCandidate = contentItemValueAndChildrenArray.get(firstEntryIndex);
 					}
 
-					JsonValue lastEntryCandidate = contentItemValueAndChildrenArray.get(contentItemValueAndChildrenArray.size()-1);
-					if (lastEntryCandidate != null && lastEntryCandidate.getValueType() == JsonValue.ValueType.ARRAY) {
-						lastEntryInValueArray = (JsonArray)(lastEntryCandidate);
-						slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: have potential children in last array entry",location);
+					Object lastEntryCandidate = contentItemValueAndChildrenArray.get(contentItemValueAndChildrenArray.length()-1);
+					if (lastEntryCandidate instanceof JSONArray) {
+						lastEntryInValueArray = (JSONArray)(lastEntryCandidate);
+						LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: have potential children in last array entry",location);
 					}
 				}
 			}
@@ -1359,32 +1310,31 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 			{
 				if (contentItemAttributesObject != null) {
 					{
-						JsonValue labelValue = contentItemAttributesObject.get(reservedKeywordForSimplifiedLabelAttributeInSRFile);
-						if (labelValue != null && labelValue.getValueType() == JsonValue.ValueType.STRING) {
-							String labelString = ((JsonString)labelValue).getString();
-							slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: have labelString {}",location,labelString);
+						Object labelValue = contentItemAttributesObject.opt(reservedKeywordForSimplifiedLabelAttributeInSRFile);
+						if (labelValue instanceof String labelString) {
+							LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: have labelString {}",location,labelString);
 							referencedContentItemIdentifiersBySimplifiedLabel.put(labelString,location);
 						}
 					}
 					{
-						JsonValue referencedLabelValue = contentItemAttributesObject.get(reservedKeywordForSimplifiedReferenceToLabelAttributeInSRFile);
-						if (referencedLabelValue != null && referencedLabelValue.getValueType() == JsonValue.ValueType.STRING) {
-							referencedLabelString = ((JsonString)referencedLabelValue).getString();
-							slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: have referencedLabelString {}",location,referencedLabelString);
+						Object referencedLabelValue = contentItemAttributesObject.opt(reservedKeywordForSimplifiedReferenceToLabelAttributeInSRFile);
+						if (referencedLabelValue instanceof String labelString) {
+							referencedLabelString = labelString;
+							LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: have referencedLabelString {}",location,referencedLabelString);
 						}
 					}
 					{
-						JsonValue observationUIDValue = contentItemAttributesObject.get(reservedKeywordForObservationUIDAttributeInSRFile);
-						if (observationUIDValue != null && observationUIDValue.getValueType() == JsonValue.ValueType.STRING) {
-							observationUID = ((JsonString)observationUIDValue).getString();
-							slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: have observationUID {}",location,observationUID);
+						Object observationUIDValue = contentItemAttributesObject.opt(reservedKeywordForObservationUIDAttributeInSRFile);
+						if (observationUIDValue instanceof String labelString) {
+							observationUID = labelString;
+							LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: have observationUID {}",location,observationUID);
 						}
 					}
 					{
-						JsonValue observationDateTimeValue = contentItemAttributesObject.get(reservedKeywordForObservationDateTimeAttributeInSRFile);
-						if (observationDateTimeValue != null && observationDateTimeValue.getValueType() == JsonValue.ValueType.STRING) {
-							observationDateTime = ((JsonString)observationDateTimeValue).getString();
-							slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: have observationDateTime {}",location,observationDateTime);
+						Object observationDateTimeValue = contentItemAttributesObject.opt(reservedKeywordForObservationDateTimeAttributeInSRFile);
+						if (observationDateTimeValue instanceof String labelString) {
+							observationDateTime = labelString;
+							LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: have observationDateTime {}",location,observationDateTime);
 						}
 					}
 				}
@@ -1397,37 +1347,36 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 					String templatemappingresource = null;
 					if (contentItemAttributesObject != null) {
 						for (String attributeName : contentItemAttributesObject.keySet()) {
-							JsonValue attributeValue = contentItemAttributesObject.get(attributeName);
-							if (attributeValue != null && attributeValue.getValueType() == JsonValue.ValueType.STRING) {
-								String attributeValueString = ((JsonString)attributeValue).getString();
+							Object attributeValue = contentItemAttributesObject.get(attributeName);
+							if (attributeValue instanceof String attributeValueString) {
 								if (attributeName.equals(reservedKeywordForContinuityOfContentAttributeInSRFile)) {
 									continuity = attributeValueString;
-									if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: continuity = {}",location,continuity);
+									if (LOG.isDebugEnabled()) LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: continuity = {}",location,continuity);
 								}
 								else if (attributeName.equals(reservedKeywordForTemplateIdentifierAttributeInSRFile)) {
 									template = attributeValueString;
-									if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: template = {}",location,template);
+									if (LOG.isDebugEnabled()) LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: template = {}",location,template);
 								}
 								else if (attributeName.equals(reservedKeywordForTemplateMappingResourceAttributeInSRFile)) {
 									templatemappingresource = attributeValueString;
-									if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: templatemappingresource = {}",location,templatemappingresource);
+									if (LOG.isDebugEnabled()) LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: templatemappingresource = {}",location,templatemappingresource);
 								}
 								else if (!isCommonAnnotationAttribute(attributeName)) {
-									slf4jlogger.warn("{}: Unrecognized CONTAINER attribute {} for concept {}",location,attributeName,concept);
+									LOG.warn("{}: Unrecognized CONTAINER attribute {} for concept {}",location,attributeName,concept);
 								}
 							}
 							else {
-								slf4jlogger.error("{}: Incorrect JSON type for value of attribute {} for concept {}",location,attributeName,concept);
+								LOG.error("{}: Incorrect JSON type for value of attribute {} for concept {}",location,attributeName,concept);
 							}
 						}
 					}
 					
-					if (firstEntryCandidate != null && firstEntryCandidate.getValueType() == JsonValue.ValueType.ARRAY) {
-						contentItemChildren = (JsonArray)firstEntryCandidate;
-						if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: CONTAINER with children but no attributes concept = {}",location,concept);
+					if (firstEntryCandidate instanceof JSONArray) {
+						contentItemChildren = (JSONArray)firstEntryCandidate;
+						if (LOG.isDebugEnabled()) LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: CONTAINER with children but no attributes concept = {}",location,concept);
 					}
 					else {
-						slf4jlogger.error("{}: Malformed non-empty array for CONTAINER content item for concept {}",location,concept);
+						LOG.error("{}: Malformed non-empty array for CONTAINER content item for concept {}",location,concept);
 					}
 					
 					contentItem = contentItemFactory.makeContainerContentItem(
@@ -1441,20 +1390,20 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 				else if (valueType.equals("CODE")) {
 					CodedSequenceItem value = null;
 					String valueBusinessName = null;
-					if (contentItemValue != null && contentItemValue.getValueType() == JsonValue.ValueType.STRING) {
-						valueBusinessName = ((JsonString)contentItemValue).getString();
+					if (contentItemValue instanceof String) {
+						valueBusinessName = (String)contentItemValue;
 					}
-					else if (firstEntryCandidate != null && firstEntryCandidate.getValueType() == JsonValue.ValueType.STRING) {
-						valueBusinessName = ((JsonString)firstEntryCandidate).getString();
+					else if (firstEntryCandidate instanceof String) {
+						valueBusinessName = (String)firstEntryCandidate;
 					}
 					if (valueBusinessName != null) {
 						value = getCodedSequenceItemForBusinessNameUsedAsValue(valueBusinessName,location);
 						if (value == null) {
-							slf4jlogger.error("{}: Unrecognized business name {} for value in CODE content item for concept {}",location,valueBusinessName,concept);
+							LOG.error("{}: Unrecognized business name {} for value in CODE content item for concept {}",location,valueBusinessName,concept);
 						}
 					}
 					else {
-						slf4jlogger.error("{}: Missing business name string in CODE content item for concept {}",location,concept);
+						LOG.error("{}: Missing business name string in CODE content item for concept {}",location,concept);
 					}
 					if (haveChildrenForSingleStringOrCodeJsonContentItemValue(contentItemValue,contentItemAttributesObject)) {
 						contentItemChildren = lastEntryInValueArray;
@@ -1477,61 +1426,60 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 					{
 						if (contentItemAttributesObject != null) {
 							for (String attributeName : contentItemAttributesObject.keySet()) {
-								JsonValue attributeValue = contentItemAttributesObject.get(attributeName);
+								Object attributeValue = contentItemAttributesObject.get(attributeName);
 								if (attributeValue != null) {
-									if (attributeValue.getValueType() == JsonValue.ValueType.STRING) {
-										String attributeValueString = ((JsonString)attributeValue).getString();
+									if (attributeValue instanceof String attributeValueString) {
 										if (attributeName.equals(reservedKeywordForMeasurementUnitsAttributeInNumericContentItem)) {
 											String unitsBusinessName = attributeValueString;
-											if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: unitsBusinessName = {}",location,unitsBusinessName);
+											if (LOG.isDebugEnabled()) LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: unitsBusinessName = {}",location,unitsBusinessName);
 											units = getCodedSequenceItemForBusinessNameUsedAsUnits(unitsBusinessName,location);
 										}
 										else if (attributeName.equals(reservedKeywordForNumericValueQualifierAttributeInNumericContentItem)) {
 											String businessNameForQualifierCode = attributeValueString;
-											if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: businessNameForQualifierCode = {}",location,businessNameForQualifierCode);
+											if (LOG.isDebugEnabled()) LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: businessNameForQualifierCode = {}",location,businessNameForQualifierCode);
 											qualifierCode = getCodedSequenceItemForBusinessNameUsedAsUnits(businessNameForQualifierCode,location);
 										}
 										else if (!isCommonAnnotationAttribute(attributeName)) {
-											slf4jlogger.warn("{}: Unrecognized NUM attribute {} for concept {}",location,attributeName,concept);
+											LOG.warn("{}: Unrecognized NUM attribute {} for concept {}",location,attributeName,concept);
 										}
 									}
-									else if (attributeValue.getValueType() == JsonValue.ValueType.NUMBER) {
-										double attributeValueNumber = ((JsonNumber)attributeValue).doubleValue();
+									else if (attributeValue instanceof Number numberValue) {
+										final double attributeValueNumber = numberValue.doubleValue();
 										if (attributeName.equals(reservedKeywordForFloatingPointValueAttributeInNumericContentItem)) {
-											floatingPointValue = new Double(attributeValueNumber);
+											floatingPointValue = attributeValueNumber;
 										}
 										else if (attributeName.equals(reservedKeywordForRationalNumeratorAttributeInNumericContentItem)) {
-											rationalNumeratorValue = new Integer((int)attributeValueNumber);
+											rationalNumeratorValue = (int) attributeValueNumber;
 										}
 										else if (attributeName.equals(reservedKeywordForRationalDenominatorAttributeInNumericContentItem)) {
-											rationalDenominatorValue = new Long((long)attributeValueNumber);
+											rationalDenominatorValue = (long) attributeValueNumber;
 										}
 										else if (!isCommonAnnotationAttribute(attributeName)) {
-											slf4jlogger.warn("{}: Unrecognized NUM attribute {} for concept {}",location,attributeName,concept);
+											LOG.warn("{}: Unrecognized NUM attribute {} for concept {}",location,attributeName,concept);
 										}
 									}
 								}
 							}
+						} else {
+							LOG.error("{}: No units in NUM content item for concept {} ",location,concept);
 						}
-						else {
-							slf4jlogger.error("{}: No units in NUM content item for concept {} ",location,concept);
-						}
+
 						if (units == null) {
-							slf4jlogger.error("{}: Missing or empty or unrecognized units in NUM content item for concept {}",location,concept);
+							LOG.error("{}: Missing or empty or unrecognized units in NUM content item for concept {}",location,concept);
 						}
 					}
 					{
-						JsonValue useValue = null;
+						Object useValue = null;
 						// should we be using, allowing, checking for NUMBER rather than STRING? E.g., consistent with CP 1861 that allows either for Annex F JSON :(
-						if (contentItemValue != null && (contentItemValue.getValueType() == JsonValue.ValueType.STRING || contentItemValue.getValueType() == JsonValue.ValueType.NUMBER)) {
+						if (contentItemValue instanceof String || contentItemValue instanceof Number) {
 							useValue = contentItemValue;
 						}
-						else if (firstEntryCandidate != null && (firstEntryCandidate.getValueType() == JsonValue.ValueType.STRING || firstEntryCandidate.getValueType() == JsonValue.ValueType.NUMBER)) {
+						else if (firstEntryCandidate instanceof String || firstEntryCandidate instanceof Number) {
 							useValue = firstEntryCandidate;
 						}
 						value = getSingleStringValueOrNullFromJsonStringOrNumberContentItemValue(useValue,valueType,concept);
 						if (value == null) {
-							slf4jlogger.error("{}: No value in NUM content item for concept {}",location,concept);
+							LOG.error("{}: No value in NUM content item for concept {}",location,concept);
 						}
 					}
 
@@ -1550,13 +1498,11 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 																			units,
 																			qualifierCode,
 																			observationDateTime,observationUID);
-				}
-				else if (valueType.equals("DATETIME")) {
-					JsonValue useValue = null;
-					if (contentItemValue != null && contentItemValue.getValueType() == JsonValue.ValueType.STRING) {
+				} else if (valueType.equals("DATETIME")) {
+					Object useValue = null;
+					if (contentItemValue instanceof String) {
 						useValue = contentItemValue;
-					}
-					else if (firstEntryCandidate != null && firstEntryCandidate.getValueType() == JsonValue.ValueType.STRING) {
+					} else if (firstEntryCandidate instanceof String) {
 						useValue = firstEntryCandidate;
 					}
 					String value = getSingleStringValueOrNullFromJsonContentItemValue(useValue,valueType,concept);
@@ -1571,11 +1517,10 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 																			 observationDateTime,observationUID);
 				}
 				else if (valueType.equals("DATE")) {
-					JsonValue useValue = null;
-					if (contentItemValue != null && contentItemValue.getValueType() == JsonValue.ValueType.STRING) {
+					Object useValue = null;
+					if (contentItemValue instanceof String) {
 						useValue = contentItemValue;
-					}
-					else if (firstEntryCandidate != null && firstEntryCandidate.getValueType() == JsonValue.ValueType.STRING) {
+					} else if (firstEntryCandidate instanceof String) {
 						useValue = firstEntryCandidate;
 					}
 					String value = getSingleStringValueOrNullFromJsonContentItemValue(useValue,valueType,concept);
@@ -1590,11 +1535,11 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 																		 observationDateTime,observationUID);
 				}
 				else if (valueType.equals("TIME")) {
-					JsonValue useValue = null;
-					if (contentItemValue != null && contentItemValue.getValueType() == JsonValue.ValueType.STRING) {
+					Object useValue = null;
+					if (contentItemValue instanceof String) {
 						useValue = contentItemValue;
 					}
-					else if (firstEntryCandidate != null && firstEntryCandidate.getValueType() == JsonValue.ValueType.STRING) {
+					else if (firstEntryCandidate instanceof String) {
 						useValue = firstEntryCandidate;
 					}
 					String value = getSingleStringValueOrNullFromJsonContentItemValue(useValue,valueType,concept);
@@ -1610,33 +1555,32 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 				}
 				else if (valueType.equals("PNAME")) {
 					String value = null;
-					JsonValue useValue = null;
-					if (contentItemValue != null && contentItemValue.getValueType() == JsonValue.ValueType.STRING) {
+					Object useValue = null;
+					if (contentItemValue instanceof String) {
 						useValue = contentItemValue;
-					}
-					else if (firstEntryCandidate != null && firstEntryCandidate.getValueType() == JsonValue.ValueType.STRING) {
+					} else if (firstEntryCandidate instanceof String) {
 						useValue = firstEntryCandidate;
 					}
 					if (useValue != null) {
-						slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: PNAME encoded as single string not attributes",location);
+						LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: PNAME encoded as single string not attributes",location);
 						value = getSingleStringValueOrNullFromJsonContentItemValue(useValue,valueType,concept);
 						if (haveChildrenForSingleStringOrCodeJsonContentItemValue(contentItemValue,contentItemAttributesObject)) {
 							contentItemChildren = lastEntryInValueArray;
 						}
 					}
 					else if (contentItemAttributesObject != null) {
-						slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: PNAME extracting components from contentItemAttributesObject",location);
+						LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: PNAME extracting components from contentItemAttributesObject",location);
 						value = JSONRepresentationOfDicomObjectFactory.getJsonPersonNameFromPropertiesInJsonObject(contentItemAttributesObject,
 							reservedKeywordForAlphabeticPropertyInPersonNameContentItem,
 							reservedKeywordForIdeographicPropertyInPersonNameContentItem,
 							reservedKeywordForPhoneticPropertyInPersonNameContentItem);
-						slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: PNAME is {}",location,value);
-						if (lastEntryInValueArray != null && lastEntryInValueArray.getValueType() == JsonValue.ValueType.ARRAY) {	// hmm :(
-							slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: PNAME have children",location);
+						LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: PNAME is {}",location,value);
+						if (lastEntryInValueArray != null) {	// hmm :(
+							LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: PNAME have children",location);
 							contentItemChildren = lastEntryInValueArray;
 						}
 						else {
-							slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: PNAME has no children",location);
+							LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: PNAME has no children",location);
 						}
 					}
 					
@@ -1648,11 +1592,10 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 																			   observationDateTime,observationUID);
 				}
 				else if (valueType.equals("UIDREF")) {
-					JsonValue useValue = null;
-					if (contentItemValue != null && contentItemValue.getValueType() == JsonValue.ValueType.STRING) {
+					Object useValue = null;
+					if (contentItemValue instanceof String) {
 						useValue = contentItemValue;
-					}
-					else if (firstEntryCandidate != null && firstEntryCandidate.getValueType() == JsonValue.ValueType.STRING) {
+					} else if (firstEntryCandidate instanceof String) {
 						useValue = firstEntryCandidate;
 					}
 					String value = getSingleStringValueOrNullFromJsonContentItemValue(useValue,valueType,concept);
@@ -1667,11 +1610,10 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 																		observationDateTime,observationUID);
 				}
 				else if (valueType.equals("TEXT")) {
-					JsonValue useValue = null;
-					if (contentItemValue != null && contentItemValue.getValueType() == JsonValue.ValueType.STRING) {
+					Object useValue = null;
+					if (contentItemValue instanceof String) {
 						useValue = contentItemValue;
-					}
-					else if (firstEntryCandidate != null && firstEntryCandidate.getValueType() == JsonValue.ValueType.STRING) {
+					} else if (firstEntryCandidate instanceof String) {
 						useValue = firstEntryCandidate;
 					}
 					String value = getSingleStringValueOrNullFromJsonContentItemValue(useValue,valueType,concept);
@@ -1692,55 +1634,51 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 
 					if (contentItemAttributesObject != null) {
 						for (String attributeName : contentItemAttributesObject.keySet()) {
-							JsonValue attributeValue = contentItemAttributesObject.get(attributeName);
+							Object attributeValue = contentItemAttributesObject.get(attributeName);
 							if (attributeValue != null) {
-								if (attributeValue.getValueType() == JsonValue.ValueType.STRING) {
-									String attributeValueString = ((JsonString)attributeValue).getString();
+								if (attributeValue instanceof String attributeValueString) {
 									if (attributeName.equals(reservedKeywordForGraphicTypeAttributeInCoordinatesContentItem)) {
 										graphicType = attributeValueString;
-										if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: graphicType = {}",location,graphicType);
+										if (LOG.isDebugEnabled()) LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: graphicType = {}",location,graphicType);
 									}
 									else if (!isCommonAnnotationAttribute(attributeName)) {
-										slf4jlogger.warn("{}: Unrecognized SCOORD attribute {} for concept {}",location,attributeName,concept);
+										LOG.warn("{}: Unrecognized SCOORD attribute {} for concept {}",location,attributeName,concept);
 									}
-								}
-								else if (attributeValue.getValueType() == JsonValue.ValueType.ARRAY) {
-									JsonArray attributeValueArray = (JsonArray)attributeValue;
+								} else if (attributeValue instanceof JSONArray attributeValueArray) {
 									if (attributeName.equals(reservedKeywordFor2DCoordinatesAttributeInCoordinatesContentItem)) {
-										int n = attributeValueArray.size();
+										int n = attributeValueArray.length();
 										if (n > 0) {
 											graphicData = new float[n];
 											for (int i=0; i<n; ++i) {
-												JsonValue arrayValue = attributeValueArray.get(i);
-												if (arrayValue != null && arrayValue.getValueType() == JsonValue.ValueType.NUMBER) {
-													graphicData[i] = (float)(((JsonNumber)arrayValue).doubleValue());
+												Object arrayValue = attributeValueArray.get(i);
+												if (arrayValue instanceof Number numberValue) {
+													graphicData[i] = (float)numberValue.doubleValue();
 												}
 												else {
-													slf4jlogger.error("{}: Missing graphicData array value type {} in SCOORD content item for concept {} ",location,arrayValue.getValueType(),concept);
+													LOG.error("{}: Missing graphicData array value type {} in SCOORD content item for concept {} ",location,arrayValue.getClass(),concept);
 												}
 											}
 										}
-									}
-									else if (!isCommonAnnotationAttribute(attributeName)) {
-										slf4jlogger.warn("{}: Unrecognized SCOORD attribute {} for concept {}",location,attributeName,concept);
+									} else if (!isCommonAnnotationAttribute(attributeName)) {
+										LOG.warn("{}: Unrecognized SCOORD attribute {} for concept {}",location,attributeName,concept);
 									}
 								}
 							}
 						}
 					}
 					else {
-						slf4jlogger.error("{}: No graphic type and coordinates in SCOORD content item for concept {} ",location,concept);
+						LOG.error("{}: No graphic type and coordinates in SCOORD content item for concept {} ",location,concept);
 					}
 
-					if (graphicType == null || graphicType.length() == 0) {
-						slf4jlogger.error("{}: Missing or empty graphicType in SCOORD content item for concept {}",location,concept);
+					if (graphicType == null || graphicType.isEmpty()) {
+						LOG.error("{}: Missing or empty graphicType in SCOORD content item for concept {}",location,concept);
 					}
 					if (graphicData == null) {
-						slf4jlogger.error("{}: Missing graphicData array in SCOORD content item for concept {}",location,concept);
+						LOG.error("{}: Missing graphicData array in SCOORD content item for concept {}",location,concept);
 					}
 
 					// check we have children ... we have no value per se, so if there is anything beyond the attributes, that will be the child array
-					if (contentItemValueAndChildrenArray.size() > (contentItemAttributesObject == null ? 0 : 1)) {
+					if (contentItemValueAndChildrenArray.length() > (contentItemAttributesObject == null ? 0 : 1)) {
 						contentItemChildren = lastEntryInValueArray;
 					}
 
@@ -1760,61 +1698,59 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 
 					if (contentItemAttributesObject != null) {
 						for (String attributeName : contentItemAttributesObject.keySet()) {
-							JsonValue attributeValue = contentItemAttributesObject.get(attributeName);
+							Object attributeValue = contentItemAttributesObject.get(attributeName);
 							if (attributeValue != null) {
-								if (attributeValue.getValueType() == JsonValue.ValueType.STRING) {
-									String attributeValueString = ((JsonString)attributeValue).getString();
+								if (attributeValue instanceof String attributeValueString) {
 									if (attributeName.equals(reservedKeywordForGraphicTypeAttributeInCoordinatesContentItem)) {
 										graphicType = attributeValueString;
-										if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: graphicType = {}",location,graphicType);
+										if (LOG.isDebugEnabled()) LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: graphicType = {}",location,graphicType);
 									}
 									else if (attributeName.equals(reservedKeywordForReferencedFrameOfReferenceUIDAttributeInCoordinatesContentItem)) {
 										referencedFrameOfReferenceUID = attributeValueString;
-										if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedFrameOfReferenceUID = {}",location,referencedFrameOfReferenceUID);
+										if (LOG.isDebugEnabled()) LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedFrameOfReferenceUID = {}",location,referencedFrameOfReferenceUID);
 									}
 									else if (!isCommonAnnotationAttribute(attributeName)) {
-										slf4jlogger.warn("{}: Unrecognized SCOORD3D attribute {} for concept {}",location,attributeName,concept);
+										LOG.warn("{}: Unrecognized SCOORD3D attribute {} for concept {}",location,attributeName,concept);
 									}
 								}
-								else if (attributeValue.getValueType() == JsonValue.ValueType.ARRAY) {
-									JsonArray attributeValueArray = (JsonArray)attributeValue;
+								else if (attributeValue instanceof JSONArray attributeValueArray) {
 									if (attributeName.equals(reservedKeywordFor3DCoordinatesAttributeInCoordinatesContentItem)) {
-										int n = attributeValueArray.size();
+										int n = attributeValueArray.length();
 										if (n > 0) {
 											graphicData = new float[n];
 											for (int i=0; i<n; ++i) {
-												JsonValue arrayValue = attributeValueArray.get(i);
-												if (arrayValue != null && arrayValue.getValueType() == JsonValue.ValueType.NUMBER) {
-													graphicData[i] = (float)(((JsonNumber)arrayValue).doubleValue());
+												Object arrayValue = attributeValueArray.get(i);
+												if (arrayValue instanceof Number numberValue) {
+													graphicData[i] = (float)numberValue.doubleValue();
 												}
 												else {
-													slf4jlogger.error("{}: Missing graphicData array value type {} in SCOORD content item for concept {} ",location,arrayValue.getValueType(),concept);
+													LOG.error("{}: Missing graphicData array value type {} in SCOORD content item for concept {} ",location,arrayValue.getClass(),concept);
 												}
 											}
 										}
 									}
 									else if (!isCommonAnnotationAttribute(attributeName)) {
-										slf4jlogger.warn("{}: Unrecognized SCOORD3D attribute {} for concept {}",location,attributeName,concept);
+										LOG.warn("{}: Unrecognized SCOORD3D attribute {} for concept {}",location,attributeName,concept);
 									}								}
 							}
 						}
 					}
 					else {
-						slf4jlogger.error("{}: No graphic type and coordinates in SCOORD content item for concept {} ",location,concept);
+						LOG.error("{}: No graphic type and coordinates in SCOORD content item for concept {} ",location,concept);
 					}
 
 					if (graphicType == null || graphicType.length() == 0) {
-						slf4jlogger.error("{}: Missing or empty graphicType in SCOORD content item for concept {}",location,concept);
+						LOG.error("{}: Missing or empty graphicType in SCOORD content item for concept {}",location,concept);
 					}
 					if (graphicData == null) {
-						slf4jlogger.error("{}: Missing graphicData array in SCOORD content item for concept {}",location,concept);
+						LOG.error("{}: Missing graphicData array in SCOORD content item for concept {}",location,concept);
 					}
-					if (referencedFrameOfReferenceUID == null || referencedFrameOfReferenceUID.length() == 0) {
-						slf4jlogger.error("{}: Missing or empty referencedFrameOfReferenceUID in SCOORD content item for concept {}",location,concept);
+					if (referencedFrameOfReferenceUID == null || referencedFrameOfReferenceUID.isEmpty()) {
+						LOG.error("{}: Missing or empty referencedFrameOfReferenceUID in SCOORD content item for concept {}",location,concept);
 					}
 
 					// check we have children ... we have no value per se, so if there is anything beyond the attributes, that will be the child array
-					if (contentItemValueAndChildrenArray.size() > (contentItemAttributesObject == null ? 0 : 1)) {
+					if (contentItemValueAndChildrenArray.length() > (contentItemAttributesObject == null ? 0 : 1)) {
 						contentItemChildren = lastEntryInValueArray;
 					}
 
@@ -1828,7 +1764,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 																					   observationDateTime,observationUID);
 				}
 				else if (valueType.equals("IMAGE")) {
-					if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: populating IMAGE content item",location);
+					if (LOG.isDebugEnabled()) LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: populating IMAGE content item",location);
 					String referencedSOPClassUID = null;
 					String referencedSOPInstanceUID = null;
 					int referencedFrameNumber = 0;	// need to handle multiple values as array (001181) :(
@@ -1840,69 +1776,67 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 					
 					if (contentItemAttributesObject != null) {
 						for (String attributeName : contentItemAttributesObject.keySet()) {
-							JsonValue attributeValue = contentItemAttributesObject.get(attributeName);
-							if (attributeValue != null && attributeValue.getValueType() == JsonValue.ValueType.STRING) {
-								String attributeValueString = ((JsonString)attributeValue).getString();
+							Object attributeValue = contentItemAttributesObject.get(attributeName);
+							if (attributeValue instanceof String attributeValueString) {
 								if (attributeName.equals(reservedKeywordForReferencedSOPClassUIDAttributeInCompositeContentItem)) {
 									referencedSOPClassUID = attributeValueString;
-									slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedSOPClassUID = {}",location,referencedSOPClassUID);
+									LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedSOPClassUID = {}",location,referencedSOPClassUID);
 									referencedSOPClassUID = JSONRepresentationOfDicomObjectFactory.substituteUIDForKeywordIfPossible(referencedSOPClassUID);
-									slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedSOPClassUID after replacement of keyword with UID = {}",location,referencedSOPClassUID);
+									LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedSOPClassUID after replacement of keyword with UID = {}",location,referencedSOPClassUID);
 								}
 								else if (attributeName.equals(reservedKeywordForReferencedSOPInstanceUIDAttributeInCompositeContentItem)) {
 									referencedSOPInstanceUID = attributeValueString;
-									slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedSOPInstanceUID = {}",location,referencedSOPInstanceUID);
+									LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedSOPInstanceUID = {}",location,referencedSOPInstanceUID);
 								}
 								else if (attributeName.equals(reservedKeywordForPresentationStateSOPClassUIDAttributeInCompositeContentItem)) {
 									presentationStateSOPClassUID = attributeValueString;
-									slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: presentationStateSOPClassUID = {}",location,presentationStateSOPClassUID);
+									LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: presentationStateSOPClassUID = {}",location,presentationStateSOPClassUID);
 									presentationStateSOPClassUID = JSONRepresentationOfDicomObjectFactory.substituteUIDForKeywordIfPossible(presentationStateSOPClassUID);
-									slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: presentationStateSOPClassUID after replacement of keyword with UID = {}",location,presentationStateSOPClassUID);
+									LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: presentationStateSOPClassUID after replacement of keyword with UID = {}",location,presentationStateSOPClassUID);
 								}
 								else if (attributeName.equals(reservedKeywordForPresentationStateSOPInstanceUIDAttributeInCompositeContentItem)) {
 									presentationStateSOPInstanceUID = attributeValueString;
-									slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: presentationStateSOPInstanceUID = {}",location,presentationStateSOPInstanceUID);
+									LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: presentationStateSOPInstanceUID = {}",location,presentationStateSOPInstanceUID);
 								}
 								else if (attributeName.equals(reservedKeywordForRealWorldValueMappingSOPClassUIDAttributeInCompositeContentItem)) {
 									realWorldValueMappingSOPClassUID = attributeValueString;
-									slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: realWorldValueMappingSOPClassUID = {}",location,realWorldValueMappingSOPClassUID);
+									LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: realWorldValueMappingSOPClassUID = {}",location,realWorldValueMappingSOPClassUID);
 									realWorldValueMappingSOPClassUID = JSONRepresentationOfDicomObjectFactory.substituteUIDForKeywordIfPossible(realWorldValueMappingSOPClassUID);
-									slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: realWorldValueMappingSOPClassUID after replacement of keyword with UID = {}",location,realWorldValueMappingSOPClassUID);
+									LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: realWorldValueMappingSOPClassUID after replacement of keyword with UID = {}",location,realWorldValueMappingSOPClassUID);
 								}
 								else if (attributeName.equals(reservedKeywordForRealWorldValueMappingSOPInstanceUIDAttributeInCompositeContentItem)) {
 									realWorldValueMappingSOPInstanceUID = attributeValueString;
-									slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: realWorldValueMappingSOPInstanceUID = {}",location,realWorldValueMappingSOPInstanceUID);
+									LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: realWorldValueMappingSOPInstanceUID = {}",location,realWorldValueMappingSOPInstanceUID);
 								}
 								else if (!isCommonAnnotationAttribute(attributeName)) {
-									slf4jlogger.warn("{}: Unrecognized IMAGE String attribute {} for concept {}",location,attributeName,concept);
+									LOG.warn("{}: Unrecognized IMAGE String attribute {} for concept {}",location,attributeName,concept);
 								}
 							}
-							else if (attributeValue != null && attributeValue.getValueType() == JsonValue.ValueType.NUMBER) {
-								int attributeValueNumber = (int)(((JsonNumber)attributeValue).intValue());
+							else if (attributeValue instanceof Number attributeValueNumber) {
 								if (attributeName.equals(reservedKeywordForReferencedFrameNumberAttributeInCompositeContentItem)) {
-									referencedFrameNumber = attributeValueNumber;
-									if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedFrameNumber = {}",location,referencedFrameNumber);
+									referencedFrameNumber = attributeValueNumber.intValue();
+									if (LOG.isDebugEnabled()) LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedFrameNumber = {}",location,referencedFrameNumber);
 								}
 								else if (attributeName.equals(reservedKeywordForReferencedSegmentNumberAttributeInCompositeContentItem)) {
-									referencedSegmentNumber = attributeValueNumber;
-									if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedSegmentNumber = {}",location,referencedSegmentNumber);
+									referencedSegmentNumber = attributeValueNumber.intValue();
+									if (LOG.isDebugEnabled()) LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedSegmentNumber = {}",location,referencedSegmentNumber);
 								}
 								else if (!isCommonAnnotationAttribute(attributeName)) {
-									slf4jlogger.warn("{}: Unrecognized IMAGE Number attribute {} for concept {}",location,attributeName,concept);
+									LOG.warn("{}: Unrecognized IMAGE Number attribute {} for concept {}",location,attributeName,concept);
 								}
 							}
 							// also need to handle multiple values of referencedFrameNumber as array (001181) :(
 							else {
-								slf4jlogger.error("{}: Incorrect JSON type for value of attribute {} for concept {}",location,attributeName,concept);
+								LOG.error("{}: Incorrect JSON type for value of attribute {} for concept {}",location,attributeName,concept);
 							}
 						}
 					}
 					else {
-						slf4jlogger.error("{}: No SOP Class and SOP Instance in IMAGE content item for concept {} ",location,concept);
+						LOG.error("{}: No SOP Class and SOP Instance in IMAGE content item for concept {} ",location,concept);
 					}
 					
 					// check we have children ... we have no value per se, so if there is anything beyond the attributes, that will be the child array
-					if (contentItemValueAndChildrenArray.size() > (contentItemAttributesObject == null ? 0 : 1)) {
+					if (contentItemValueAndChildrenArray.length() > (contentItemAttributesObject == null ? 0 : 1)) {
 						contentItemChildren = lastEntryInValueArray;
 					}
 					
@@ -1919,40 +1853,39 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 																		  observationDateTime,observationUID);
 				}
 				else if (valueType.equals("COMPOSITE")) {
-					if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: populating COMPOSITE content item",location);
+					if (LOG.isDebugEnabled()) LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: populating COMPOSITE content item",location);
 					String referencedSOPClassUID = null;
 					String referencedSOPInstanceUID = null;
 					
 					if (contentItemAttributesObject != null) {
 						for (String attributeName : contentItemAttributesObject.keySet()) {
-							JsonValue attributeValue = contentItemAttributesObject.get(attributeName);
-							if (attributeValue != null && attributeValue.getValueType() == JsonValue.ValueType.STRING) {
-								String attributeValueString = ((JsonString)attributeValue).getString();
+							Object attributeValue = contentItemAttributesObject.get(attributeName);
+							if (attributeValue instanceof String attributeValueString) {
 								if (attributeName.equals(reservedKeywordForReferencedSOPClassUIDAttributeInCompositeContentItem)) {
 									referencedSOPClassUID = attributeValueString;
-									slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedSOPClassUID = {}",location,referencedSOPClassUID);
+									LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedSOPClassUID = {}",location,referencedSOPClassUID);
 									referencedSOPClassUID = JSONRepresentationOfDicomObjectFactory.substituteUIDForKeywordIfPossible(referencedSOPClassUID);
-									slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedSOPClassUID after replacement of keyword with UID = {}",location,referencedSOPClassUID);
+									LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedSOPClassUID after replacement of keyword with UID = {}",location,referencedSOPClassUID);
 								}
 								else if (attributeName.equals(reservedKeywordForReferencedSOPInstanceUIDAttributeInCompositeContentItem)) {
 									referencedSOPInstanceUID = attributeValueString;
-									slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedSOPInstanceUID = {}",location,referencedSOPInstanceUID);
+									LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedSOPInstanceUID = {}",location,referencedSOPInstanceUID);
 								}
 								else if (!isCommonAnnotationAttribute(attributeName)) {
-									slf4jlogger.warn("{}: Unrecognized COMPOSITE String attribute {} for concept {}",location,attributeName,concept);
+									LOG.warn("{}: Unrecognized COMPOSITE String attribute {} for concept {}",location,attributeName,concept);
 								}
 							}
 							else {
-								slf4jlogger.error("{}: Incorrect JSON type for value of attribute {} for concept {}",location,attributeName,concept);
+								LOG.error("{}: Incorrect JSON type for value of attribute {} for concept {}",location,attributeName,concept);
 							}
 						}
 					}
 					else {
-						slf4jlogger.error("{}: No SOP Class and SOP Instance in COMPOSITE content item for concept {} ",location,concept);
+						LOG.error("{}: No SOP Class and SOP Instance in COMPOSITE content item for concept {} ",location,concept);
 					}
 					
 					// check we have children ... we have no value per se, so if there is anything beyond the attributes, that will be the child array
-					if (contentItemValueAndChildrenArray.size() > (contentItemAttributesObject == null ? 0 : 1)) {
+					if (contentItemValueAndChildrenArray.length() > (contentItemAttributesObject == null ? 0 : 1)) {
 						contentItemChildren = lastEntryInValueArray;
 					}
 					
@@ -1966,72 +1899,71 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 				}
 				else {
 					// unrecognized content item valueType ... so what ?
-					slf4jlogger.error("{}: Unrecognized value type {} for concept {}",location,valueType,concept);
+					LOG.error("{}: Unrecognized value type {} for concept {}",location,valueType,concept);
 				}
 			}
 			else {
-				slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: No value type so checking for by-reference",location);
-				slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedLabelString = {}",location,referencedLabelString);
+				LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: No value type so checking for by-reference",location);
+				LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedLabelString = {}",location,referencedLabelString);
 				if (referencedLabelString != null) {
 					String referencedContentItemIdentifier = referencedContentItemIdentifiersBySimplifiedLabel.get(referencedLabelString);
 					if (referencedContentItemIdentifier != null) {
-					slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedLabelString {} maps to referencedContentItemIdentifier",location,referencedLabelString,referencedContentItemIdentifier);
+					LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: referencedLabelString {} maps to referencedContentItemIdentifier",location,referencedLabelString,referencedContentItemIdentifier);
 						contentItem = new ContentItemWithReference(
 							null /* parent will be set later by addChild() operation */,
 							relationshipType,
 							referencedContentItemIdentifier);
 					}
 					else {
-						slf4jlogger.error("{}: Unable to resolve simplified label {}",location,referencedLabelString);
+						LOG.error("{}: Unable to resolve simplified label {}",location,referencedLabelString);
 					}
 				}
 			}
 			
-			if (contentItemChildren != null && contentItemChildren.size() > 0) {
-				int n = contentItemChildren.size();
+			if (contentItemChildren != null && !contentItemChildren.isEmpty()) {
+				int n = contentItemChildren.length();
 				for (int i=0; i<n; ++i) {
-					slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: Processing child # {}",location,i);
+					LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: Processing child # {}",location,i);
 					String childLocation = location+"."+Integer.toString(i+1);
-					JsonValue arrayValue = contentItemChildren.get(i);
-					if (arrayValue != null && arrayValue.getValueType() == JsonValue.ValueType.OBJECT) {
-						JsonObject contentItemChild = (JsonObject)arrayValue;
-						Set<String> childBusinessNames = contentItemChild.keySet();
+					Object arrayValue = contentItemChildren.get(i);
+					if (arrayValue instanceof JSONObject contentItemChild) {
+                        Set<String> childBusinessNames = contentItemChild.keySet();
 						if (childBusinessNames.size() == 1) {
 							String childBusinessName = childBusinessNames.iterator().next();
-							slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: JSON child businessName = {}",childLocation,childBusinessName);
+							LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: JSON child businessName = {}",childLocation,childBusinessName);
 							if (childBusinessName != null) {
 								CodedSequenceItem childBusinessNameCode = getCodedSequenceItemForBusinessNameUsedAsConceptName(childBusinessName,childLocation);
-								JsonValue childObjectValue = contentItemChild.get(childBusinessName);
+								Object childObjectValue = contentItemChild.get(childBusinessName);
 								String childValueType = null;
 								{
 									Set<String> childValueTypes = valueTypesByBusinessName.get(childBusinessName);
 									childValueType = selectFromAlternativeValueTypesForBusinessName(childLocation,childBusinessName,valueType,childValueTypes,childObjectValue);
 								}
-								slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: childValueType from lookup {} for {}",childLocation,childValueType,childBusinessName);
+								LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: childValueType from lookup {} for {}",childLocation,childValueType,childBusinessName);
 								
 								if (childValueType == null) {
 									childValueType = determineUnknownValueType(valueType,childObjectValue);
-									slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: unknown childValueType determined to be {} for {}",childLocation,childValueType,childBusinessName);
+									LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: unknown childValueType determined to be {} for {}",childLocation,childValueType,childBusinessName);
 								}
 								
 								if (childValueType == null) {
-									slf4jlogger.debug("{}: Could not determine value type for child {} of {} {} - OK if this is a reference",childLocation,childBusinessName,valueType,businessName);
+									LOG.debug("{}: Could not determine value type for child {} of {} {} - OK if this is a reference",childLocation,childBusinessName,valueType,businessName);
 								}
 
 								String childRelationshipType = null;
 								{
 									Set<String> childRelationshipTypes = relationshipTypesByBusinessName.get(childBusinessName);
 									childRelationshipType = selectFromAlternativeRelationshipTypesForBusinessName(childLocation,childBusinessName,valueType,childValueType,childRelationshipTypes);
-									slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: childRelationshipType from lookup {} for business name {}",childLocation,childRelationshipType,childBusinessName);
+									LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: childRelationshipType from lookup {} for business name {}",childLocation,childRelationshipType,childBusinessName);
 								}
 								
 								if (childRelationshipType == null) {
 									childRelationshipType = determineUnknownRelationshipType(valueType,childValueType,childObjectValue);
-									slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: unknown childRelationshipType determined to be {} for {}",childLocation,childRelationshipType,childBusinessName);
+									LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: unknown childRelationshipType determined to be {} for {}",childLocation,childRelationshipType,childBusinessName);
 								}
 								
 								if (childRelationshipType == null) {
-									slf4jlogger.error("{}: Could not determine relationship type for child {}",childLocation,childBusinessName);
+									LOG.error("{}: Could not determine relationship type for child {}",childLocation,childBusinessName);
 								}
 								
 								// OK for childValueType == null && childRelationshipType == null if by reference
@@ -2041,11 +1973,11 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 								}
 							}
 							else {
-								slf4jlogger.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: Ignoring anonymous business name for now",childLocation);	// can this even happen ?? :(
+								LOG.debug("getContentItemAndChildrenFromJSONObjectValue(): {}: Ignoring anonymous business name for now",childLocation);	// can this even happen ?? :(
 							}
 						}
 						else {
-							slf4jlogger.error("{}: Expected only one entry for child object # {} in array of children",childLocation,i);
+							LOG.error("{}: Expected only one entry for child object # {} in array of children",childLocation,i);
 						}
 					}
 				}
@@ -2063,23 +1995,23 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 * @return						the StructuredReport
 	 * @throws	DicomException
 	 */
-	public StructuredReport getStructuredReport(JsonObject topLevelObject) throws DicomException {
+	public StructuredReport getStructuredReport(JSONObject topLevelObject) throws DicomException {
 		DicomDictionary dictionary = DicomDictionary.StandardDictionary;
 		StructuredReport structuredReport = null;
 		try {
 			if (topLevelObject != null) {
-				slf4jlogger.debug("Looking for SR container entry in top level object amongst all the DICOM keywords");
+				LOG.debug("Looking for SR container entry in top level object amongst all the DICOM keywords");
 				String rootContainerBusinessName = null;
 				CodedSequenceItem rootContainerBusinessNameCode = null;
 				String location = "1";
-				// a JsonObject is a Map<String,JsonValue>, so iterate through map entry keys
+				// a JSONObject is a Map<String,JsonValue>, so iterate through map entry keys
 				for (String businessName : topLevelObject.keySet()) {
-					slf4jlogger.debug("JSON businessName = {}",businessName);
+					LOG.debug("JSON businessName = {}",businessName);
 					if (businessName != null) {
 						// we are at the top level, so DICOM standard keywords or hex tags override any coded business names, since may be duplicates, e.g., (111060,DCM,"Study Date")
 						if (dictionary.getTagFromName(businessName) == null && JSONRepresentationOfDicomObjectFactory.getAttributeTagFromHexadecimalGroupElementValues(businessName) == null) {
 							CodedSequenceItem businessNameCode = getCodedSequenceItemForBusinessNameUsedAsConceptName(businessName,location);
-							if (slf4jlogger.isDebugEnabled()) slf4jlogger.debug("getStructuredReport(): businessName {} is {}",businessName,businessNameCode);
+							if (LOG.isDebugEnabled()) LOG.debug("getStructuredReport(): businessName {} is {}",businessName,businessNameCode);
 							if (businessNameCode != null) {
 								if (rootContainerBusinessNameCode == null) {
 									rootContainerBusinessName = businessName;
@@ -2094,7 +2026,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 							}
 						}
 						else {
-							slf4jlogger.debug("getStructuredReport(): Ignoring businessName {} that is a DICOM keyword",businessName);
+							LOG.debug("getStructuredReport(): Ignoring businessName {} that is a DICOM keyword",businessName);
 						}
 					}
 					else {
@@ -2102,7 +2034,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 					}
 				}
 				// if we get here, we found one and only one coded business name to use as rootContainerBusinessNameCode
-				JsonValue topLevelObjectValue = topLevelObject.get(rootContainerBusinessName);
+				Object topLevelObjectValue = topLevelObject.get(rootContainerBusinessName);
 				if (topLevelObjectValue != null) {
 					contentItemFactory = new ContentItemFactory();
 					ContentItem root = getContentItemAndChildrenFromJSONObjectValue(rootContainerBusinessName,rootContainerBusinessNameCode,"CONTAINER",null/*relationshipType*/,topLevelObjectValue,location);	// processes entire tree
@@ -2122,7 +2054,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 		catch (ClassCastException e) {
 			throw new DicomException("Could not parse JSON document - expected object in top level array "+e);
 		}
-//System.err.println("getStructuredReport(JsonObject topLevelObject): structuredReport is "+structuredReport);
+//System.err.println("getStructuredReport(JSONObject topLevelObject): structuredReport is "+structuredReport);
 		return structuredReport;
 	}
 
@@ -2135,10 +2067,10 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 * @return						the StructuredReport
 	 * @throws	DicomException
 	 */
-	public StructuredReport getStructuredReport(JsonArray document) throws DicomException {
+	public StructuredReport getStructuredReport(JSONArray document) throws DicomException {
 		StructuredReport structuredReport = null;
 		try {
-			JsonObject topLevelObject = document.getJsonObject(0);
+			JSONObject topLevelObject = document.getJSONObject(0);
 			structuredReport = getStructuredReport(topLevelObject);
 		}
 		catch (IndexOutOfBoundsException e) {
@@ -2147,7 +2079,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 		catch (ClassCastException e) {
 			throw new DicomException("Could not parse JSON document - expected object in top level array "+e);
 		}
-//System.err.println("getStructuredReport(JsonArray document): structuredReport is "+structuredReport);
+//System.err.println("getStructuredReport(JSONArray document): structuredReport is "+structuredReport);
 		return structuredReport;
 	}
 	
@@ -2159,9 +2091,8 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 * @return						the list of DICOM attributes
 	 * @throws	DicomException
 	 */
-	public AttributeList getAttributeList(JsonObject topLevelObject) throws DicomException {
-		AttributeList list = null;
-		list = new JSONRepresentationOfDicomObjectFactory().getAttributeList(topLevelObject,true/*ignoreUnrecognizedTags*/,true/*ignoreSR*/);	// ignoreUnrecognizedTags is need to skip the SR business names mixed in with the content, but not the private tags
+	public AttributeList getAttributeList(JSONObject topLevelObject) throws DicomException {
+		AttributeList list = new JSONRepresentationOfDicomObjectFactory().getAttributeList(topLevelObject,true/*ignoreUnrecognizedTags*/,true/*ignoreSR*/);	// ignoreUnrecognizedTags is need to skip the SR business names mixed in with the content, but not the private tags
 		{
 			StructuredReport structuredReport = getStructuredReport(topLevelObject);
 			AttributeList structuredReportList = structuredReport.getAttributeList();
@@ -2170,7 +2101,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 			}
 			// else wasn't an SR so ignore it
 		}
-//System.err.println("getAttributeList(JsonObject topLevelObject): List is "+list);
+//System.err.println("getAttributeList(JSONObject topLevelObject): List is "+list);
 		return list;
 	}
 
@@ -2182,11 +2113,10 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 * @return						the list of DICOM attributes
 	 * @throws	DicomException
 	 */
-	public AttributeList getAttributeList(JsonArray document) throws DicomException {
-		AttributeList list = null;
+	public AttributeList getAttributeList(JSONArray document) throws DicomException {
 		try {
-			JsonObject topLevelObject = document.getJsonObject(0);
-			list = getAttributeList(topLevelObject);
+			JSONObject topLevelObject = document.getJSONObject(0);
+			return getAttributeList(topLevelObject);
 		}
 		catch (IndexOutOfBoundsException e) {
 			throw new DicomException("Could not parse JSON document - exactly one object in top level array expected "+e);
@@ -2194,8 +2124,6 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 		catch (ClassCastException e) {
 			throw new DicomException("Could not parse JSON document - expected object in top level array "+e);
 		}
-//System.err.println("getAttributeList(JsonArray document): List is "+list);
-		return list;
 	}
 	
 	/**
@@ -2208,9 +2136,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 * @throws	DicomException
 	 */
 	public AttributeList getAttributeList(InputStream stream) throws IOException, DicomException {
-		JsonReader jsonReader = Json.createReader(stream);
-		JsonArray document = jsonReader.readArray();
-		jsonReader.close();
+		JSONArray document = new JSONArray(stream);
 		return getAttributeList(document);
 	}
 	
@@ -2257,10 +2183,10 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 * @param	document	the JSON document
 	 * @throws	IOException
 	 */
-	public static void write(OutputStream out,JsonArray document) throws IOException {
-		JsonWriter writer = Json.createWriterFactory(null/*config*/).createWriter(out);	// charset is UTF-8
-		writer.writeArray(document);
-		writer.close();
+	public static void write(OutputStream out,JSONArray document) throws IOException {
+		try(Writer writer = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
+			document.write(writer);
+		}
 	}
 
 	/**
@@ -2270,10 +2196,10 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 * @param	document	the JSON document
 	 * @throws	IOException
 	 */
-	public static void write(File outputFile,JsonArray document) throws IOException {
-		OutputStream out = new FileOutputStream(outputFile);
-		write(out,document);
-		out.close();
+	public static void write(File outputFile,JSONArray document) throws IOException {
+		try(OutputStream out = new FileOutputStream(outputFile)) {
+			write(out,document);
+		}
 	}
 
 	/**
@@ -2283,7 +2209,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 * @param	document	the JSON document
 	 * @throws	IOException
 	 */
-	public static void write(String outputPath,JsonArray document) throws IOException {
+	public static void write(String outputPath,JSONArray document) throws IOException {
 		write(new File(outputPath),document);
 	}
 
@@ -2321,7 +2247,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 	 */
 	public static void createDocumentAndWriteIt(StructuredReport sr,AttributeList list,OutputStream out) throws DicomException {
 		try {
-			JsonArray document = new JSONRepresentationOfStructuredReportObjectFactory().getDocument(sr,list);
+			JSONArray document = new JSONRepresentationOfStructuredReportObjectFactory().getDocument(sr,list);
 			write(out,document);
 		}
 		catch (Exception e) {
@@ -2389,7 +2315,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 					//case "USETAG":				useKeywordInsteadOfTag = false; --endOptionsPosition; break;
 					
 					default:	if (endOptionsPosition > numberOfFixedAndOptionalArguments) {
-									slf4jlogger.error("Unrecognized argument {}",option);
+									LOG.error("Unrecognized argument {}",option);
 									bad = true;
 								}
 								keepLooking = false;
@@ -2460,7 +2386,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 				if (toJSON) {
 					JSONRepresentationOfStructuredReportObjectFactory j = new JSONRepresentationOfStructuredReportObjectFactory();
 					{
-						JsonArray document = j.getDocument(inputPath);
+						JSONArray document = j.getDocument(inputPath);
 						//System.err.println(toString(document));
 						if (outputPath == null) {
 							write(System.out,document);
@@ -2470,7 +2396,7 @@ public class JSONRepresentationOfStructuredReportObjectFactory {
 						}
 					}
 					if (businessNamesPath != null) {
-						JsonArray businessNamesDocument = j.getBusinessNamesDocument();
+						JSONArray businessNamesDocument = j.getBusinessNamesDocument();
 						write(businessNamesPath,businessNamesDocument);
 					}
 				}

@@ -5,25 +5,22 @@ package com.pixelmed.dicom;
 import com.pixelmed.utils.StringUtilities;
 
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Iterator;
+import java.util.Scanner;
 import java.util.Vector;
 
 import com.pixelmed.slf4j.Logger;
 import com.pixelmed.slf4j.LoggerFactory;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.json.JSONTokener;
 
 /**
  * <p>A class to encode a representation of a DICOM object in a JSON form, and to convert it back again.</p>
@@ -104,7 +101,6 @@ public class JSONRepresentationOfDicomObjectFactory {
 	protected static String reservedKeywordForPersonNameIdeographicPropertyInJsonRepresentation = "Ideographic";
 	protected static String reservedKeywordForPersonNamePhoneticPropertyInJsonRepresentation = "Phonetic";
 
-	private JsonBuilderFactory factory;
 	
 	protected static String substituteKeywordForUIDIfPossible(String value) {
 		String keyword = null;
@@ -239,7 +235,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @throws	DicomException
 	 */
 	void addAttributesFromJsonObjectToList(AttributeList list,JSONObject parent,boolean ignoreUnrecognizedTags,boolean ignoreSR) throws DicomException {
-		DicomDictionary dictionary = list.getDictionary();
+		DicomDictionary dictionary = AttributeList.getDictionary();
 		if (parent != null) {
 			// a JsonObject is a Map<String,JsonValue>, so iterate through map entry keys
 			for (String elementName : parent.keySet()) {
@@ -247,17 +243,17 @@ public class JSONRepresentationOfDicomObjectFactory {
 				String jsonSingleValue = null;
 				JSONObject jsonAttributeVRAndValue = null;
 				{
-					JsonValue jsonAttributeVRAndValueAsJsonValue = parent.get(elementName);
+					Object jsonAttributeVRAndValueAsJsonValue = parent.get(elementName);
 					if (jsonAttributeVRAndValueAsJsonValue != null) {
-						if (jsonAttributeVRAndValueAsJsonValue.getValueType() == JsonValue.ValueType.OBJECT) {
-							jsonAttributeVRAndValue = (JsonObject)jsonAttributeVRAndValueAsJsonValue;
+						if (jsonAttributeVRAndValueAsJsonValue instanceof JSONObject objectValue) {
+							jsonAttributeVRAndValue = objectValue;
 						}
-						else if (jsonAttributeVRAndValueAsJsonValue.getValueType() == JsonValue.ValueType.STRING) {
-							jsonSingleValue = ((JsonString)jsonAttributeVRAndValueAsJsonValue).getString();
+						else if (jsonAttributeVRAndValueAsJsonValue instanceof String stringValue) {
+							jsonSingleValue = stringValue;
 							slf4jlogger.debug("JsonValue.ValueType.STRING jsonSingleValue = {}",jsonSingleValue);
 						}
-						else if (jsonAttributeVRAndValueAsJsonValue.getValueType() == JsonValue.ValueType.NUMBER) {
-							jsonSingleValue = ((JsonNumber)jsonAttributeVRAndValueAsJsonValue).toString();	// could mess with specific types but hope that BigDecimal.toString() always works
+						else if (jsonAttributeVRAndValueAsJsonValue instanceof Number numberValue) {
+							jsonSingleValue = numberValue.toString();	// could mess with specific types but hope that BigDecimal.toString() always works
 							if (jsonSingleValue == null) {
 								jsonSingleValue = "";
 							}
@@ -301,7 +297,8 @@ public class JSONRepresentationOfDicomObjectFactory {
 				if (addIt) {
 					if (tag != null) {
 						{
-							String explicitVRString = jsonAttributeVRAndValue ==  null ? "" : jsonAttributeVRAndValue.getString("vr","");	// set default of null in case missing, which is permitted
+
+							String explicitVRString = jsonAttributeVRAndValue ==  null ? "" : jsonAttributeVRAndValue.optString("vr","");	// set default of null in case missing, which is permitted
 							byte[] explicitVR = explicitVRString.getBytes();
 							if (vr == null) {
 								vr = explicitVR;	// may still be null of not present in JSON
@@ -319,7 +316,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 									}
 									// else wrong or empty
 								}
-								else if (explicitVRString.length() > 0) {
+								else if (!explicitVRString.isEmpty()) {
 									throw new DicomException("Dictionary VR <"+vrString+"> does not match VR in attribute <"+explicitVRString+"> of element "+elementName);
 								}
 								// else was empty so assume dictionary VR is correct
@@ -393,23 +390,16 @@ public class JSONRepresentationOfDicomObjectFactory {
 										stringValue = substituteUIDForKeywordIfPossibleAndAppropriateForVR(stringValue,vr);
 										a.addValue(stringValue);
 									}
-									else if (values != null && values.length() > 0) {
+									else if (values != null && !values.isEmpty()) {
 										// values is a List<JsonValue> so can use List.get method to get JsonValue and then switch on its type
-										for (int i=0; i<values.length(); ++i) {
-											JsonValue value = values.get(i);
-											JsonValue.ValueType valueType = value.getValueType();
-											if (valueType == JsonValue.ValueType.STRING) {
-												String stringValue = ((JsonString)value).getString();
+										for (Object value: values) {
+											if (value instanceof String stringValue) {
 												slf4jlogger.debug("addAttributesFromJsonObjectToList(): String Value stringValue = {}",stringValue);
-												if (stringValue == null) {
-													stringValue = "";
-												}
 												stringValue = StringUtilities.removeLeadingOrTrailingWhitespaceOrISOControl(stringValue);	// just in case ? need more eacape handling ? :(
 												stringValue = substituteUIDForKeywordIfPossibleAndAppropriateForVR(stringValue,vr);
 												a.addValue(stringValue);
-											}
-											else if (valueType == JsonValue.ValueType.NUMBER) {
-												String stringValue = ((JsonNumber)value).toString();	// could mess with specific types but hope that BigDecimal.toString() always works
+											} else if (value instanceof Number numberValue) {
+												String stringValue = numberValue.toString();	// could mess with specific types but hope that BigDecimal.toString() always works
 												slf4jlogger.debug("addAttributesFromJsonObjectToList(): Number Value stringValue = {}",stringValue);
 												//System.err.println("Value stringValue = "+stringValue);
 												if (stringValue == null) {
@@ -420,12 +410,10 @@ public class JSONRepresentationOfDicomObjectFactory {
 												}
 												a.addValue(stringValue);
 											}
-											else if (valueType == JsonValue.ValueType.OBJECT && ValueRepresentation.isPersonNameVR(vr)) {
-												JsonObject jsonObjectValue = (JsonObject)value;
-												String stringValue = getJsonPersonNameFromPropertiesInJsonObject(jsonObjectValue,reservedKeywordForPersonNameAlphabeticPropertyInJsonRepresentation,reservedKeywordForPersonNameIdeographicPropertyInJsonRepresentation,reservedKeywordForPersonNamePhoneticPropertyInJsonRepresentation);
+											else if (ValueRepresentation.isPersonNameVR(vr) && value instanceof JSONObject jsonObjectValue) {
+                                                String stringValue = getJsonPersonNameFromPropertiesInJsonObject(jsonObjectValue,reservedKeywordForPersonNameAlphabeticPropertyInJsonRepresentation,reservedKeywordForPersonNameIdeographicPropertyInJsonRepresentation,reservedKeywordForPersonNamePhoneticPropertyInJsonRepresentation);
 												a.addValue(stringValue);
-											}
-											else if (valueType == JsonValue.ValueType.NULL) {
+											} else if (value == null) {
 												a.addValue("");		// empty value ... assumes string VR
 											}
 											else {
@@ -475,32 +463,32 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @param	phoneticProperty
 	 */
 	
-	public static void addPersonNameAsComponentsToJsonObject(JsonObjectBuilder jsonPersonNameValue,String value,String alphabeticProperty,String ideographicProperty,String phoneticProperty) {
+	public static void addPersonNameAsComponentsToJsonObject(JSONObject jsonPersonNameValue,String value,String alphabeticProperty,String ideographicProperty,String phoneticProperty) {
 		Vector<String> nameComponentGroups = PersonNameAttribute.getNameComponentGroups(value);
 		int numberOfNameComponentGroups = nameComponentGroups.size();
 		if (numberOfNameComponentGroups >= 1) {
 			String alphabetic = nameComponentGroups.get(0);
 			if (alphabetic != null && alphabetic.length() > 0) {
-				jsonPersonNameValue.add(alphabeticProperty,alphabetic);
+				jsonPersonNameValue.append(alphabeticProperty,alphabetic);
 			}
 		}
 		if (numberOfNameComponentGroups >= 2) {
 			String ideographic = nameComponentGroups.get(1);
 			if (ideographic != null && ideographic.length() > 0) {
-				jsonPersonNameValue.add(ideographicProperty,ideographic);
+				jsonPersonNameValue.append(ideographicProperty,ideographic);
 			}
 		}
 		if (numberOfNameComponentGroups >= 3) {
 			String phonetic = nameComponentGroups.get(2);
 			if (phonetic != null && phonetic.length() > 0) {
-				jsonPersonNameValue.add(phoneticProperty,phonetic);
+				jsonPersonNameValue.append(phoneticProperty,phonetic);
 			}
 		}
 	}
 
 	/**
 	 * @param	list
-	 * @param	parentObjectBuilder
+	 * @param	parent
 	 * @param	useKeywordInsteadOfTag	use the keyword from the DicomDictionary rather than the hexadecimal tag group and element
 	 * @param	addTag					add the hexadecimal group and element as an additional attribute
 	 * @param	addKeyword				add the DicomDictionary keyword as an additional attribute
@@ -508,13 +496,13 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @deprecated
 	 * @throws	DicomException
 	 */
-	void addAttributesFromListToJsonObject(AttributeList list,JsonObjectBuilder parentObjectBuilder,boolean useKeywordInsteadOfTag,boolean addTag,boolean addKeyword,boolean ignoreSR) throws DicomException {
-		addAttributesFromListToJsonObject(list,parentObjectBuilder,useKeywordInsteadOfTag,addTag,addKeyword,true/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,ignoreSR,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
+	void addAttributesFromListToJsonObject(AttributeList list,JSONObject parent,boolean useKeywordInsteadOfTag,boolean addTag,boolean addKeyword,boolean ignoreSR) throws DicomException {
+		addAttributesFromListToJsonObject(list,parent,useKeywordInsteadOfTag,addTag,addKeyword,true/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,ignoreSR,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
 	}
 	
 	/**
 	 * @param	list
-	 * @param	parentObjectBuilder
+	 * @param	parent
 	 * @param	useKeywordInsteadOfTag	use the keyword from the DicomDictionary rather than the hexadecimal tag group and element
 	 * @param	addTag					add the hexadecimal group and element as an additional attribute
 	 * @param	addKeyword				add the DicomDictionary keyword as an additional attribute
@@ -526,7 +514,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @param	useNumberForIntegerOrDecimalString	whether or not to use JSON Number instead of JSON String for IS and DS attributes
 	 * @throws	DicomException
 	 */
-	void addAttributesFromListToJsonObject(AttributeList list,JsonObjectBuilder parentObjectBuilder,boolean useKeywordInsteadOfTag,boolean addTag,boolean addKeyword,boolean addVR,boolean collapseValueArrays,boolean collapseEmptyToNull,boolean ignoreSR,boolean substituteUIDKeywords,boolean useNumberForIntegerOrDecimalString) throws DicomException {
+	void addAttributesFromListToJsonObject(AttributeList list,JSONObject parent,boolean useKeywordInsteadOfTag,boolean addTag,boolean addKeyword,boolean addVR,boolean collapseValueArrays,boolean collapseEmptyToNull,boolean ignoreSR,boolean substituteUIDKeywords,boolean useNumberForIntegerOrDecimalString) throws DicomException {
 		//DicomDictionary dictionary = list.getDictionary();
 		Iterator i = list.values().iterator();
 		while (i.hasNext()) {
@@ -542,7 +530,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 			double jsonSingleNumericValue = 0;
 			boolean haveJsonSingleNumericValue = false;
 
-			JsonArrayBuilder jsonValues = null;
+			JSONArray jsonValues = new JSONArray();
 			String inLineBinary = null;
 			
 			if (ignoreSR && (
@@ -560,14 +548,13 @@ public class JSONRepresentationOfDicomObjectFactory {
 			else if (attribute instanceof SequenceAttribute) {
 				SequenceAttribute sa = (SequenceAttribute)attribute;
 				if (sa.getNumberOfItems() > 0) {
-					jsonValues = factory.createArrayBuilder();
 					Iterator si = sa.iterator();
 					while (si.hasNext()) {
 						SequenceItem item = (SequenceItem)si.next();
 						AttributeList itemList = item.getAttributeList();
-						JsonObjectBuilder jsonSequenceItemAttributeListValue = factory.createObjectBuilder();
+						JSONObject jsonSequenceItemAttributeListValue = new JSONObject();
 						addAttributesFromListToJsonObject(itemList,jsonSequenceItemAttributeListValue,useKeywordInsteadOfTag,addTag,addKeyword,addVR,collapseValueArrays,collapseEmptyToNull,ignoreSR,substituteUIDKeywords,useNumberForIntegerOrDecimalString);
-						jsonValues.add(jsonSequenceItemAttributeListValue);
+						jsonValues.put(jsonSequenceItemAttributeListValue);
 					}
 				}
 				// else empty sequence so encode no values at all
@@ -581,19 +568,19 @@ public class JSONRepresentationOfDicomObjectFactory {
 					slf4jlogger.debug("addAttributesFromListToJsonObject(): Ignoring exception",e);
 				}
 				if (values != null && values.length > 0) {
-					jsonValues = factory.createArrayBuilder();
+					jsonValues = new JSONArray();
 					for (int j=0; j<values.length; ++j) {
 						String value = values[j];
 						if (value != null && value.length() > 0) {
-							JsonObjectBuilder jsonPersonNameValue = factory.createObjectBuilder();
+							JSONObject jsonPersonNameValue =  new JSONObject();
 							addPersonNameAsComponentsToJsonObject(jsonPersonNameValue,value,
 								reservedKeywordForPersonNameAlphabeticPropertyInJsonRepresentation,
 								reservedKeywordForPersonNameIdeographicPropertyInJsonRepresentation,
 								reservedKeywordForPersonNamePhoneticPropertyInJsonRepresentation);
-							jsonValues.add(jsonPersonNameValue);
+							jsonValues.put(jsonPersonNameValue);
 						}
 						else {
-							jsonValues.addNull();
+							jsonValues.put((String)null);
 						}
 					}
 				}
@@ -624,17 +611,17 @@ public class JSONRepresentationOfDicomObjectFactory {
 						}
 					}
 					else {
-						jsonValues = factory.createArrayBuilder();
+						jsonValues = new JSONArray();
 						if (ValueRepresentation.isDecimalStringVR(vr)) {
 							String stringValues[] = attribute.getStringValues();
 							// use the String that was originally supplied rather than reconverting double back to String
 							for (int j=0; j<vm; ++j) {
 								if (useNumberForIntegerOrDecimalString) {
 									// unfortunately javax.json Builders have no methods to add JSON Number from String :(
-									jsonValues.add(new BigDecimal(stringValues[j]));	// does not preserve "-7.8e-1" :(
+									jsonValues.put(new BigDecimal(stringValues[j]));	// does not preserve "-7.8e-1" :(
 								}
 								else {
-									jsonValues.add(stringValues[j]);	// preserves "-7.8e-1"
+									jsonValues.put(stringValues[j]);	// preserves "-7.8e-1"
 								}
 							}
 						}
@@ -643,7 +630,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 							double doubleValues[] = null;
 							doubleValues=attribute.getDoubleValues();
 							for (int j=0; j<vm; ++j) {
-								jsonValues.add(doubleValues[j]);
+								jsonValues.put(doubleValues[j]);
 							}
 						}
 					}
@@ -675,17 +662,17 @@ public class JSONRepresentationOfDicomObjectFactory {
 						}
 					}
 					else {
-						jsonValues = factory.createArrayBuilder();
+						jsonValues = new JSONArray();
 						if (ValueRepresentation.isIntegerStringVR(vr)) {
 							String stringValues[] = attribute.getStringValues();
 							// use the String that was originally supplied rather than reconverting double back to String
 							for (int j=0; j<vm; ++j) {
 								if (useNumberForIntegerOrDecimalString) {
 									// unfortunately javax.json Builders have no methods to add JSON Number from String :(
-									jsonValues.add(new BigInteger(stringValues[j]));
+									jsonValues.put(new BigInteger(stringValues[j]));
 								}
 								else {
-									jsonValues.add(stringValues[j]);
+									jsonValues.put(stringValues[j]);
 								}
 							}
 						}
@@ -694,7 +681,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 							long longValues[] = null;
 							longValues=attribute.getLongValues();
 							for (int j=0; j<vm; ++j) {
-								jsonValues.add(longValues[j]);
+								jsonValues.put(longValues[j]);
 							}
 						}
 					}
@@ -704,7 +691,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 			else if (ValueRepresentation.isBase64EncodedInJSON(vr)) {
 				byte values[] = attribute.getByteValues(false/*big*/);	// assume always little endian since big endian forbidden in PS3.18
 				if (values != null && values.length > 0) {
-					inLineBinary = javax.xml.bind.DatatypeConverter.printBase64Binary(values);
+					inLineBinary = Base64.getEncoder().encodeToString(values);
 				}
 			}
 			else {
@@ -724,14 +711,14 @@ public class JSONRepresentationOfDicomObjectFactory {
 							jsonSingleStringValue = substituteKeywordForUIDIfPossibleAndAppropriateForVRAndRequested(values[0],vr,substituteUIDKeywords);
 						}
 						else {
-							jsonValues = factory.createArrayBuilder();
+							jsonValues = new JSONArray();
 							for (int j=0; j<values.length; ++j) {
 								String value = values[j];
 								if (value != null && value.length() > 0) {
-									jsonValues.add(substituteKeywordForUIDIfPossibleAndAppropriateForVRAndRequested(value,vr,substituteUIDKeywords));
+									jsonValues.put(substituteKeywordForUIDIfPossibleAndAppropriateForVRAndRequested(value,vr,substituteUIDKeywords));
 								}
 								else {
-									jsonValues.addNull();
+									jsonValues.put((String) null);
 								}
 							}
 						}
@@ -753,56 +740,56 @@ public class JSONRepresentationOfDicomObjectFactory {
 
 				String elementName = useKeywordInsteadOfTag && haveKeyword ? keyword : hextag;
 
-				JsonObjectBuilder jsonAttributeVRAndValue = factory.createObjectBuilder();
+				JSONObject jsonAttributeVRAndValue = new JSONObject();
 				if (addVR || tag.isPrivate()) {
-					jsonAttributeVRAndValue.add("vr",ValueRepresentation.getAsString(vr));
+					jsonAttributeVRAndValue.put("vr",ValueRepresentation.getAsString(vr));
 				}
 				
 				boolean addJsonAttributeVRAndValue = false;
 				
 				if (addKeyword && haveKeyword) {
-					jsonAttributeVRAndValue.add("keyword",keyword);		// non-standard (not PS3.18 Annex F)
+					jsonAttributeVRAndValue.put("keyword",keyword);		// non-standard (not PS3.18 Annex F)
 					addJsonAttributeVRAndValue = true;
 				}
 				
 				if (addTag) {
-					jsonAttributeVRAndValue.add("tag",hextag);			// non-standard (not PS3.18 Annex F)
+					jsonAttributeVRAndValue.put("tag",hextag);			// non-standard (not PS3.18 Annex F)
 					addJsonAttributeVRAndValue = true;
 				}
 
 				if (jsonValues != null) {
-					jsonAttributeVRAndValue.add("Value",jsonValues);
+					jsonAttributeVRAndValue.put("Value",jsonValues);
 					addJsonAttributeVRAndValue = true;
 				}
 				else if (inLineBinary != null) {
-					jsonAttributeVRAndValue.add("InlineBinary",inLineBinary);
+					jsonAttributeVRAndValue.put("InlineBinary",inLineBinary);
 					addJsonAttributeVRAndValue = true;
 				}
 				// else empty (zero length) so encode no Value at all, not empty Value
 
 				if (jsonSingleStringValue != null) {
 					slf4jlogger.debug("addAttributesFromListToJsonObject(): {} adding jsonSingleStringValue {}",elementName,jsonSingleStringValue);
-					parentObjectBuilder.add(elementName,jsonSingleStringValue);
+					parent.put(elementName,jsonSingleStringValue);
 				}
 				else if (haveJsonSingleNumericValue) {
 					slf4jlogger.debug("addAttributesFromListToJsonObject(): {} adding jsonSingleNumericValue {}",elementName,jsonSingleNumericValue);
-					parentObjectBuilder.add(elementName,jsonSingleNumericValue);
+					parent.put(elementName,jsonSingleNumericValue);
 				}
 				else if (jsonSingleBigDecimalValue != null) {
 					slf4jlogger.debug("addAttributesFromListToJsonObject(): {} adding jsonSingleBigDecimalValue {}",elementName,jsonSingleBigDecimalValue);
-					parentObjectBuilder.add(elementName,jsonSingleBigDecimalValue);
+					parent.put(elementName,jsonSingleBigDecimalValue);
 				}
 				else if (jsonSingleBigIntegerValue != null) {
 					slf4jlogger.debug("addAttributesFromListToJsonObject(): {} adding jsonSingleBigIntegerValue {}",elementName,jsonSingleBigIntegerValue);
-					parentObjectBuilder.add(elementName,jsonSingleBigIntegerValue);
+					parent.put(elementName,jsonSingleBigIntegerValue);
 				}
 				else if (addJsonAttributeVRAndValue || !collapseEmptyToNull) {
 					slf4jlogger.debug("addAttributesFromListToJsonObject(): {} adding jsonAttributeVRAndValue {}",elementName,jsonAttributeVRAndValue);
-					parentObjectBuilder.add(elementName,jsonAttributeVRAndValue);
+					parent.put(elementName,jsonAttributeVRAndValue);
 				}
 				else {
 					slf4jlogger.debug("addAttributesFromListToJsonObject(): {} adding null {}",elementName);
-					parentObjectBuilder.addNull(elementName);
+					parent.put(elementName, (String) null);
 				}
 			}
 		}
@@ -812,7 +799,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * <p>Construct a factory object, which can be used to get JSON documents from DICOM objects.</p>
 	 */
 	public JSONRepresentationOfDicomObjectFactory() {
-		factory = Json.createBuilderFactory(null/*config*/);
+
 	}
 	
 	/**
@@ -827,7 +814,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @deprecated
 	 * @throws	DicomException
 	 */
-	public JsonArray getDocument(AttributeList list,boolean useKeywordInsteadOfTag,boolean addTag,boolean addKeyword,boolean ignoreSR) throws DicomException {
+	public JSONArray getDocument(AttributeList list,boolean useKeywordInsteadOfTag,boolean addTag,boolean addKeyword,boolean ignoreSR) throws DicomException {
 		return getDocument(list,useKeywordInsteadOfTag,addTag,addKeyword,true/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,ignoreSR,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
 	}
 	/**
@@ -846,10 +833,12 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @return							the JSON document
 	 * @throws	DicomException
 	 */
-	public JsonArray getDocument(AttributeList list,boolean useKeywordInsteadOfTag,boolean addTag,boolean addKeyword,boolean addVR,boolean collapseValueArrays,boolean collapseEmptyToNull,boolean ignoreSR,boolean substituteUIDKeywords,boolean useNumberForIntegerOrDecimalString) throws DicomException {
-		JsonObjectBuilder topLevelObjectBuilder = factory.createObjectBuilder();
+	public JSONArray getDocument(AttributeList list,boolean useKeywordInsteadOfTag,boolean addTag,boolean addKeyword,boolean addVR,boolean collapseValueArrays,boolean collapseEmptyToNull,boolean ignoreSR,boolean substituteUIDKeywords,boolean useNumberForIntegerOrDecimalString) throws DicomException {
+		JSONObject topLevelObjectBuilder = new JSONObject();
 		addAttributesFromListToJsonObject(list,topLevelObjectBuilder,useKeywordInsteadOfTag,addTag,addKeyword,addVR,collapseValueArrays,collapseEmptyToNull,ignoreSR,substituteUIDKeywords,useNumberForIntegerOrDecimalString);
-		return factory.createArrayBuilder().add(topLevelObjectBuilder).build();
+		final JSONArray array = new JSONArray();
+		array.put(topLevelObjectBuilder);
+		return array;
 	}
 
 	/**
@@ -859,7 +848,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @return							the JSON document
 	 * @throws	DicomException
 	 */
-	public JsonArray getDocument(AttributeList list) throws DicomException {
+	public JSONArray getDocument(AttributeList list) throws DicomException {
 		return getDocument(list,false/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*ignoreSR*/);
 	}
 
@@ -876,7 +865,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @throws	IOException
 	 * @throws	DicomException
 	 */
-	public JsonArray getDocument(File file,boolean useKeywordInsteadOfTag,boolean addTag,boolean addKeyword,boolean ignoreSR) throws IOException, DicomException {
+	public JSONArray getDocument(File file,boolean useKeywordInsteadOfTag,boolean addTag,boolean addKeyword,boolean ignoreSR) throws IOException, DicomException {
 		return getDocument(file,useKeywordInsteadOfTag,addTag,addKeyword,true/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,ignoreSR,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
 	}
 
@@ -897,7 +886,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @throws	IOException
 	 * @throws	DicomException
 	 */
-	public JsonArray getDocument(File file,boolean useKeywordInsteadOfTag,boolean addTag,boolean addKeyword,boolean addVR,boolean collapseValueArrays,boolean collapseEmptyToNull,boolean ignoreSR,boolean substituteUIDKeywords,boolean useNumberForIntegerOrDecimalString) throws IOException, DicomException {
+	public JSONArray getDocument(File file,boolean useKeywordInsteadOfTag,boolean addTag,boolean addKeyword,boolean addVR,boolean collapseValueArrays,boolean collapseEmptyToNull,boolean ignoreSR,boolean substituteUIDKeywords,boolean useNumberForIntegerOrDecimalString) throws IOException, DicomException {
 		AttributeList list = new AttributeList();
 		list.setDecompressPixelData(false);
 		list.read(file);
@@ -912,7 +901,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @throws	IOException
 	 * @throws	DicomException
 	 */
-	public JsonArray getDocument(File file) throws IOException, DicomException {
+	public JSONArray getDocument(File file) throws IOException, DicomException {
 		return getDocument(file,false/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*ignoreSR*/);
 	}
 
@@ -929,7 +918,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @throws	IOException
 	 * @throws	DicomException
 	 */
-	public JsonArray getDocument(String filename,boolean useKeywordInsteadOfTag,boolean addTag,boolean addKeyword,boolean ignoreSR) throws IOException, DicomException {
+	public JSONArray getDocument(String filename,boolean useKeywordInsteadOfTag,boolean addTag,boolean addKeyword,boolean ignoreSR) throws IOException, DicomException {
 		return getDocument(filename,useKeywordInsteadOfTag,addTag,addKeyword,true/*addVR*/,false/*collapseValueArrays*/,false/*collapseEmptyToNull*/,ignoreSR,false/*substituteUIDKeywords*/,false/*useNumberForIntegerOrDecimalString*/);
 	}
 
@@ -950,7 +939,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @throws	IOException
 	 * @throws	DicomException
 	 */
-	public JsonArray getDocument(String filename,boolean useKeywordInsteadOfTag,boolean addTag,boolean addKeyword,boolean addVR,boolean collapseValueArrays,boolean collapseEmptyToNull,boolean ignoreSR,boolean substituteUIDKeywords,boolean useNumberForIntegerOrDecimalString) throws IOException, DicomException {
+	public JSONArray getDocument(String filename,boolean useKeywordInsteadOfTag,boolean addTag,boolean addKeyword,boolean addVR,boolean collapseValueArrays,boolean collapseEmptyToNull,boolean ignoreSR,boolean substituteUIDKeywords,boolean useNumberForIntegerOrDecimalString) throws IOException, DicomException {
 		return getDocument(new File(filename),useKeywordInsteadOfTag,addTag,addKeyword,addVR,collapseValueArrays,collapseValueArrays,ignoreSR,substituteUIDKeywords,useNumberForIntegerOrDecimalString);
 	}
 
@@ -962,7 +951,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @throws	IOException
 	 * @throws	DicomException
 	 */
-	public JsonArray getDocument(String filename) throws IOException, DicomException {
+	public JSONArray getDocument(String filename) throws IOException, DicomException {
 		return getDocument(filename,false/*useKeywordInsteadOfTag*/,false/*addTag*/,false/*addKeyword*/,false/*ignoreSR*/);
 	}
 	
@@ -976,7 +965,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @return							the list of DICOM attributes
 	 * @throws	DicomException
 	 */
-	public AttributeList getAttributeList(JsonObject topLevelObject,boolean ignoreUnrecognizedTags,boolean ignoreSR) throws DicomException {
+	public AttributeList getAttributeList(JSONObject topLevelObject,boolean ignoreUnrecognizedTags,boolean ignoreSR) throws DicomException {
 		AttributeList list = new AttributeList();
 		addAttributesFromJsonObjectToList(list,topLevelObject,ignoreUnrecognizedTags,ignoreSR);
 //System.err.println("JSONRepresentationOfDicomObjectFactory.getAttributeList(JsonObject topLevelObject): List is "+list);
@@ -993,11 +982,11 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @return							the list of DICOM attributes
 	 * @throws	DicomException
 	 */
-	public AttributeList getAttributeList(JsonArray document,boolean ignoreUnrecognizedTags,boolean ignoreSR) throws DicomException {
+	public AttributeList getAttributeList(JSONArray document,boolean ignoreUnrecognizedTags,boolean ignoreSR) throws DicomException {
 		AttributeList list = null;
-		JsonObject topLevelObject = null;
+		JSONObject topLevelObject = null;
 		try {
-			topLevelObject = document.getJsonObject(0);
+			topLevelObject = document.getJSONObject(0);
 		}
 		catch (IndexOutOfBoundsException e) {
 			throw new DicomException("Could not parse JSON document - exactly one object in top level array expected "+e);
@@ -1016,7 +1005,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @return						the list of DICOM attributes
 	 * @throws	DicomException
 	 */
-	public AttributeList getAttributeList(JsonArray document) throws DicomException {
+	public AttributeList getAttributeList(JSONArray document) throws DicomException {
 		return getAttributeList(document,false/*ignoreUnrecognizedTags*/,false/*ignoreSR*/);
 	}
 
@@ -1028,7 +1017,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @return						the list of DICOM attributes
 	 * @throws	DicomException
 	 */
-	public AttributeList getAttributeList(JsonObject document) throws DicomException {
+	public AttributeList getAttributeList(JSONObject document) throws DicomException {
 		return getAttributeList(document,false/*ignoreUnrecognizedTags*/,false/*ignoreSR*/);
 	}
 
@@ -1042,14 +1031,15 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @throws	DicomException
 	 */
 	public AttributeList getAttributeList(InputStream stream) throws IOException, DicomException {
-		JsonReader jsonReader = Json.createReader(stream);
-		JsonStructure document = jsonReader.read();
-		jsonReader.close();
-		if (document instanceof JsonArray) {
-			return getAttributeList((JsonArray)document);
+		Scanner s = new Scanner(stream).useDelimiter("\\A");
+		String result = s.hasNext() ? s.next() : "";
+		Object document = new JSONTokener(result).nextValue();
+
+		if (document instanceof JSONArray jsonArray) {
+			return getAttributeList(jsonArray);
 		}
-		else if (document instanceof JsonObject) {
-			return getAttributeList((JsonObject)document);
+		else if (document instanceof JSONObject jsonObject) {
+			return getAttributeList(jsonObject);
 		}
 		else {
 			throw new DicomException("Could not parse JSON document - expected object or array at top level");
@@ -1066,17 +1056,9 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @throws	DicomException
 	 */
 	public AttributeList getAttributeList(File file) throws IOException, DicomException {
-		InputStream fi = new FileInputStream(file);
-		BufferedInputStream bi = new BufferedInputStream(fi);
-		AttributeList list = null;
-		try {
-			list = getAttributeList(bi);
+		try(BufferedInputStream bi = new BufferedInputStream(new FileInputStream(file));) {
+			return getAttributeList(bi);
 		}
-		finally {
-			bi.close();
-			fi.close();
-		}
-		return list;
 	}
 	
 	/**
@@ -1099,10 +1081,10 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @param	document	the JSON document
 	 * @throws	IOException
 	 */
-	public static void write(OutputStream out,JsonArray document) throws IOException {
-		JsonWriter writer = Json.createWriterFactory(null/*config*/).createWriter(out);	// charset is UTF-8
-		writer.writeArray(document);
-		writer.close();
+	public static void write(OutputStream out,JSONArray document) throws IOException {
+		try(Writer writer = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
+			document.write(writer);
+		}
 	}
 
 	/**
@@ -1112,10 +1094,10 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @param	document	the JSON document
 	 * @throws	IOException
 	 */
-	public static void write(File outputFile,JsonArray document) throws IOException {
-		OutputStream out = new FileOutputStream(outputFile);
-		write(out,document);
-		out.close();
+	public static void write(File outputFile,JSONArray document) throws IOException {
+		try(OutputStream out = new FileOutputStream(outputFile)) {
+			write(out, document);
+		}
 	}
 
 	/**
@@ -1125,7 +1107,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 * @param	document	the JSON document
 	 * @throws	IOException
 	 */
-	public static void write(String outputPath,JsonArray document) throws IOException {
+	public static void write(String outputPath,JSONArray document) throws IOException {
 		write(new File(outputPath),document);
 	}
 
@@ -1138,7 +1120,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 	 */
 	public static void createDocumentAndWriteIt(AttributeList list,OutputStream out) throws DicomException {
 		try {
-			JsonArray document = new JSONRepresentationOfDicomObjectFactory().getDocument(list);
+			JSONArray document = new JSONRepresentationOfDicomObjectFactory().getDocument(list);
 			write(out,document);
 		}
 		catch (Exception e) {
@@ -1306,7 +1288,7 @@ public class JSONRepresentationOfDicomObjectFactory {
 			}
 			else {
 				if (toJSON) {
-					JsonArray document = new JSONRepresentationOfDicomObjectFactory().getDocument(inputPath,useKeywordInsteadOfTag,addTag,addKeyword,addVR,collapseValueArrays,collapseEmptyToNull,ignoreSR,substituteUIDKeywords,useNumberForIntegerOrDecimalString);
+					JSONArray document = new JSONRepresentationOfDicomObjectFactory().getDocument(inputPath,useKeywordInsteadOfTag,addTag,addKeyword,addVR,collapseValueArrays,collapseEmptyToNull,ignoreSR,substituteUIDKeywords,useNumberForIntegerOrDecimalString);
 					//System.err.println(toString(document));
 					if (outputPath == null) {
 						write(System.out,document);

@@ -5,11 +5,10 @@ package com.pixelmed;
 import junit.framework.*;
 
 import com.pixelmed.dicom.*;
+import org.json.JSONArray;
 
 import java.io.File;
 
-import javax.json.Json;
-import javax.json.JsonArray;
 
 import java.util.Locale;
 
@@ -147,7 +146,7 @@ public class TestJSONRepresentationOfStructuredReport extends TestCase {
 			new ContentItemWithReference(clusterCoord,"SELECTED FROM","1.1.1");
 			
 			//cif.new NumericContentItem(cluster,"HAS PROPERTIES",new CodedSequenceItem("111038","DCM","Number of calcifications"),10,new CodedSequenceItem("111150","1","no units"));
-			cif.new NumericContentItem(cluster,"HAS PROPERTIES",new CodedSequenceItem("111038","DCM","Number of calcifications"),"10",10d,new Integer(20),new Long(2),new CodedSequenceItem("1","UCUM","no units"),new CodedSequenceItem("114006","DCM","Measurement failure"),observationDateTime,observationUID) ;
+			cif.new NumericContentItem(cluster,"HAS PROPERTIES",new CodedSequenceItem("111038","DCM","Number of calcifications"),"10",10d, 20,2L,new CodedSequenceItem("1","UCUM","no units"),new CodedSequenceItem("114006","DCM","Measurement failure"),observationDateTime,observationUID) ;
 			
 			ContentItem single = cif.new CodeContentItem(individual,"CONTAINS",new CodedSequenceItem("111059","DCM","Single Image Finding"),new CodedSequenceItem("F-01776","SRT","Individual Calcification"));
 			cif.new CodeContentItem(single,"HAS CONCEPT MOD",new CodedSequenceItem("111056","DCM","Rendering Intent"),new CodedSequenceItem("111150","DCM","Presentation Required: Rendering device is expected to present"));
@@ -323,10 +322,10 @@ System.err.println(sr);
 		
 		{
 			JSONRepresentationOfStructuredReportObjectFactory j = new JSONRepresentationOfStructuredReportObjectFactory();
-			JsonArray jsonDocument = j.getDocument(dicomFile);
+			JSONArray jsonDocument = j.getDocument(dicomFile);
 System.err.println(jsonDocument+"\n\n\n");
 			JSONRepresentationOfStructuredReportObjectFactory.write(jsonFile,jsonDocument);
-			JsonArray businessNamesDocument = j.getBusinessNamesDocument();
+			JSONArray businessNamesDocument = j.getBusinessNamesDocument();
 //System.err.println(businessNamesDocument+"\n\n\n");
 			JSONRepresentationOfStructuredReportObjectFactory.write(businessNamesFile,businessNamesDocument);
 		}
