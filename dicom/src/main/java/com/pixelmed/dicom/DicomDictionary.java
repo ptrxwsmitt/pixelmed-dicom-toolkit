@@ -37,8 +37,8 @@ public class DicomDictionary extends DicomDictionaryBase {
 	
 	private static final Logger slf4jlogger = LoggerFactory.getLogger(DicomDictionary.class);
 	
-	protected String xmlDicomDictionaryResourceName = "/com/pixelmed/dicom/elmdict.xml";
-	protected String xmlDicomDictionaryIEResourceName = "/com/pixelmed/dicom/elmdictie.xml";
+	protected String xmlDicomDictionaryResourceName = "/dicom/dictionary/elmdict.xml";
+	protected String xmlDicomDictionaryIEResourceName = "/dicom/dictionary/elmdictie.xml";
 
 	private Document readXMLDicomDictionary() throws IOException, ParserConfigurationException, SAXException {
 		InputStream i = DicomDictionary.class.getResourceAsStream(xmlDicomDictionaryResourceName);
