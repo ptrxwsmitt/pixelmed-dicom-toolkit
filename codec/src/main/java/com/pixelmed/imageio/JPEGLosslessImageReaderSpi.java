@@ -4,7 +4,6 @@ package com.pixelmed.imageio;
 // follow the pattern described in "http://docs.oracle.com/javase/1.5.0/docs/guide/imageio/spec/extending.fm3.html"
 
 import com.pixelmed.codec.jpeg.Markers;
-import com.pixelmed.codec.jpeg.Utilities;
 
 import java.io.IOException;
 import java.util.Locale;

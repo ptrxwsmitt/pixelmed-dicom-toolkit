@@ -8,11 +8,8 @@ import com.pixelmed.codec.jpeg.MarkerSegmentSOF;
 import com.pixelmed.codec.jpeg.OutputArrayOrStream;
 import com.pixelmed.codec.jpeg.Parse;
 
-import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
-
-import java.nio.ByteOrder;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -132,23 +129,23 @@ System.err.println("reset()");
 			this.iis = iis;
 		}
 		
-		public final int available() { return 0; }	// no such method in ImageInputStream
+		public int available() { return 0; }	// no such method in ImageInputStream
 		
-		public final void close() throws IOException { iis.close(); }
+		public void close() throws IOException { iis.close(); }
 		
-		public final void mark(int readlimit) { iis.mark(); }		// ImageInputStream has no readlimit
+		public void mark(int readlimit) { iis.mark(); }		// ImageInputStream has no readlimit
 		
-		public final boolean markSupported() { return true; }		// always supported
+		public boolean markSupported() { return true; }		// always supported
 		
-		public final int read() throws IOException { return iis.read(); }
+		public int read() throws IOException { return iis.read(); }
 		
-		public final int read(byte[] b) throws IOException { return iis.read(b); }
+		public int read(byte[] b) throws IOException { return iis.read(b); }
 		
-		public final int read(byte[] b, int off, int len) throws IOException { return iis.read(b,off,len); }
+		public int read(byte[] b, int off, int len) throws IOException { return iis.read(b,off,len); }
 		
-		public final void reset() throws IOException { iis.reset(); }
+		public void reset() throws IOException { iis.reset(); }
 		
-		public final long skip(long n) throws IOException { return iis.skipBytes(n); }
+		public long skip(long n) throws IOException { return iis.skipBytes(n); }
 	}
 	
 	public void readEverything() throws IIOException {

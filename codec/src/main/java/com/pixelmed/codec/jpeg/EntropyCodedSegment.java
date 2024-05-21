@@ -7,9 +7,7 @@ import java.awt.Shape;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Vector;
 
@@ -78,7 +76,7 @@ public class EntropyCodedSegment {
 
 	private static final int[] extractBitFromByteMask = { 0x80,0x40,0x20,0x10,0x08,0x04,0x02,0x01 };
 	
-	private final void getEnoughBits(int wantBits) throws Exception {
+	private void getEnoughBits(int wantBits) throws Exception {
 		while (haveBits < wantBits) {
 			if (bitIndex > 7) {
 				if (byteIndex < availableBytes) {
@@ -100,13 +98,13 @@ public class EntropyCodedSegment {
 	private int writeByte;		// only contains meaningful content when writeBitIndex > 0
 	private int writeBitIndex;	// 0 means ready to write 1st (high) bit to writeByte, 7 means ready to write last (low) bit to writeByte, will transiently (inside writeBits only) be 8 to signal new byte needed
 	
-	private final void initializeWriteBits() {
+	private void initializeWriteBits() {
 		copiedBytes = new ByteArrayOutputStream();
 		writeByte = 0;
 		writeBitIndex = 0;	// start writing into 1st (high) bit of writeByte
 	}
 	
-	private final void flushWriteBits() {
+	private void flushWriteBits() {
 		if (writeBitIndex > 0) {
 			// bits have been written to writeByte so need to pad it with 1s and write it
 			while (writeBitIndex < 8) {
@@ -123,7 +121,7 @@ public class EntropyCodedSegment {
 		// else have not written any bits to writeByte, so do nothing
 	}
 	
-	private final void writeBits(int bits,int nBits) {
+	private void writeBits(int bits,int nBits) {
 //System.err.println("writeBits(): writing "+nBits+" bits "+Integer.toBinaryString(bits));
 		if (nBits > 0) {
 			for (int i=nBits-1; i>=0; --i) {
@@ -160,7 +158,7 @@ public class EntropyCodedSegment {
 	 *
 	 * @return	the decoded value
 	 */
-	private final int decode()  throws Exception {
+	private int decode()  throws Exception {
 		final int[] MINCODE = usingTable.getMINCODE();
 		final int[] MAXCODE = usingTable.getMAXCODE();
 		final int[] VALPTR  = usingTable.getVALPTR();
