@@ -38,6 +38,7 @@ WiP
 ### Roadmap
 
 - Run Test using maven
+    - check for test data, test data does not seem to be provided with source code
 - Implement build pipeline
 - Fix un-handled memory leaks e.g. on exceptions
 - Apply java best practices to the code

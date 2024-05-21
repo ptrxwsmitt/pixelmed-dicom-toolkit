@@ -1,7 +1,8 @@
 /* Copyright (c) 2001-2022, David A. Clunie DBA Pixelmed Publishing. All rights reserved. */
 
-package com.pixelmed;
+package com.pixelmed.dicom;
 
+import com.pixelmed.TestDecompressedImagePixelModuleAndLossyImageCompressionHistory;
 import junit.framework.*;
 
 public class TestAttributeList_AllTests extends TestCase {

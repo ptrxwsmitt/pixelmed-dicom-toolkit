@@ -1,10 +1,6 @@
 /* Copyright (c) 2001-2022, David A. Clunie DBA Pixelmed Publishing. All rights reserved. */
 
-package com.pixelmed;
-
-import com.pixelmed.dicom.DicomException;
-import com.pixelmed.dicom.SetOfDicomFiles;
-import com.pixelmed.dicom.TransferSyntax;
+package com.pixelmed.dicom;
 
 import com.pixelmed.network.Association;
 import com.pixelmed.network.AssociationStatusHandler;

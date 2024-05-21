@@ -2,6 +2,7 @@
 
 package com.pixelmed;
 
+import com.pixelmed.dicom.TestCStore;
 import junit.framework.*;
 
 public class TestDicomNetwork_AllTests extends TestCase {

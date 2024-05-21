@@ -1,7 +1,8 @@
 /* Copyright (c) 2001-2022, David A. Clunie DBA Pixelmed Publishing. All rights reserved. */
 
-package com.pixelmed;
+package com.pixelmed.anatproc;
 
+import com.pixelmed.TestLaterality;
 import junit.framework.*;
 
 public class TestAnatomy_AllTests extends TestCase {

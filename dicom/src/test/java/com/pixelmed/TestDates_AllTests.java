@@ -2,6 +2,7 @@
 
 package com.pixelmed;
 
+import com.pixelmed.utils.TestAgeCalculation;
 import junit.framework.*;
 
 public class TestDates_AllTests extends TestCase {

@@ -1,10 +1,9 @@
 /* Copyright (c) 2001-2022, David A. Clunie DBA Pixelmed Publishing. All rights reserved. */
 
-package com.pixelmed;
-
-import com.pixelmed.dicom.*;
+package com.pixelmed.dicom;
 
 import junit.framework.*;
+import org.junit.jupiter.api.Disabled;
 
 import java.io.File;
 
@@ -91,7 +90,7 @@ public class TestPrivateCreatorValueRepresentation extends TestCase {
 			valueMultiplicity=1;
 		}
 	}
-	
+
 	public void TestPrivateCreatorValueRepresentation_FromExplicitUNVR() throws Exception {
 		String creatorValue = "Test Creator";
 		//File testFile = File.createTempFile("TestPrivateCreatorValueRepresentation_FromExplicitUNVR",".dcm");

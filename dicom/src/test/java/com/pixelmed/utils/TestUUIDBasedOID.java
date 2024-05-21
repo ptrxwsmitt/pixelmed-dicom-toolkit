@@ -1,8 +1,6 @@
 /* Copyright (c) 2001-2022, David A. Clunie DBA Pixelmed Publishing. All rights reserved. */
 
-package com.pixelmed;
-
-import com.pixelmed.utils.UUIDBasedOID;
+package com.pixelmed.utils;
 
 import java.util.HashSet;
 import java.util.Set;

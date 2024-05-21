@@ -1,9 +1,6 @@
 /* Copyright (c) 2001-2022, David A. Clunie DBA Pixelmed Publishing. All rights reserved. */
 
-package com.pixelmed;
-
-import com.pixelmed.anatproc.Concept;
-import com.pixelmed.anatproc.CTAnatomy;
+package com.pixelmed.anatproc;
 
 import com.pixelmed.dicom.Attribute;
 import com.pixelmed.dicom.AttributeList;
