@@ -37,7 +37,6 @@ import com.pixelmed.ftp.FTPFileSender;
 import com.pixelmed.ftp.FTPRemoteHost;
 
 import com.pixelmed.network.DicomNetworkException;
-import com.pixelmed.network.NetworkApplicationInformation;
 import com.pixelmed.network.NetworkApplicationInformationFederated;
 import com.pixelmed.network.NetworkApplicationProperties;
 import com.pixelmed.network.PresentationAddress;
