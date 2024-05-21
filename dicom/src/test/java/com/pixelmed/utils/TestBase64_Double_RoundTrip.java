@@ -1,12 +1,9 @@
 /* Copyright (c) 2001-2022, David A. Clunie DBA Pixelmed Publishing. All rights reserved. */
 
-package com.pixelmed;
+package com.pixelmed.utils;
 
 
-import com.pixelmed.utils.Base64Double;
 import junit.framework.*;
-
-import java.util.Base64;
 
 
 public class TestBase64_Double_RoundTrip extends TestCase {
