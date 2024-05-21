@@ -23,17 +23,17 @@ public class DatabaseApplicationProperties {
 
 	private static final String identString = "@(#) $Header: /userland/cvs/pixelmed/imgbook/com/pixelmed/database/DatabaseApplicationProperties.java,v 1.15 2022/01/21 19:51:13 dclunie Exp $";
 
-	private static final String defaultDatabaseFileName  = ".com.pixelmed.display.DicomImageViewer.database";
-	private static final String defaultSavedImagesFolderName  = ".com.pixelmed.display.DicomImageViewer.images";
-	private static final String defaultDatabaseServerName  = null;	// i.e., do not start external access server
+	private static final String DEFAULT_DATABASE_FILE_NAME = ".com.pixelmed.display.DicomImageViewer.database";
+	private static final String DEFAULT_SAVED_IMAGES_FOLDER_NAME = ".com.pixelmed.display.DicomImageViewer.images";
+	private static final String DEFAULT_DATABASE_SERVER_NAME = null;	// i.e., do not start external access server
 
-	public static final String propertyName_DatabaseFileName = "Application.DatabaseFileName";
-	public static final String propertyName_SavedImagesFolderName = "Application.SavedImagesFolderName";
-	public static final String propertyName_DatabaseServerName = "Application.DatabaseServerName";
+	public static final String PROPERTY_NAME_DATABASE_FILE_NAME = "Application.DatabaseFileName";
+	public static final String PROPERTY_NAME_SAVED_IMAGES_FOLDER_NAME = "Application.SavedImagesFolderName";
+	public static final String PROPERTY_NAME_DATABASE_SERVER_NAME = "Application.DatabaseServerName";
 	
-	private String dataBaseFileName = defaultDatabaseFileName;
-	private String savedImagesFolderName = defaultSavedImagesFolderName;
-	private String databaseServerName = defaultDatabaseServerName;
+	private final String dataBaseFileName;
+	private final String savedImagesFolderName;
+	private final String databaseServerName;
 
 	/**
 	 * <p>Extract the DICOM network properties from the supplied properties.</p>
@@ -41,18 +41,9 @@ public class DatabaseApplicationProperties {
 	 * @param	properties
 	 */
 	public DatabaseApplicationProperties(Properties properties) {
-		dataBaseFileName=properties.getProperty(propertyName_DatabaseFileName);
-		if (dataBaseFileName == null) {
-			dataBaseFileName=defaultDatabaseFileName;
-		}
-		savedImagesFolderName=properties.getProperty(propertyName_SavedImagesFolderName);
-		if (savedImagesFolderName == null) {
-			savedImagesFolderName=defaultSavedImagesFolderName;
-		}
-		databaseServerName=properties.getProperty(propertyName_DatabaseServerName);
-		if (databaseServerName == null) {
-			databaseServerName=defaultDatabaseServerName;
-		}
+		dataBaseFileName=properties.getProperty(PROPERTY_NAME_DATABASE_FILE_NAME, DEFAULT_DATABASE_FILE_NAME);
+		savedImagesFolderName=properties.getProperty(PROPERTY_NAME_SAVED_IMAGES_FOLDER_NAME, DEFAULT_SAVED_IMAGES_FOLDER_NAME);
+		databaseServerName=properties.getProperty(PROPERTY_NAME_DATABASE_SERVER_NAME, DEFAULT_DATABASE_SERVER_NAME);
 	}
 	
 	/**

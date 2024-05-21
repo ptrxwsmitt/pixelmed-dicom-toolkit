@@ -13,6 +13,14 @@ Even if there is some common definition, different manufacturers tend to interpr
 The origin of the code can be found here, which is under the BSD Licence:
 https://www.pixelmed.com/dicomtoolkit.html
 
+## Disclaimer
+
+The current state of this code is currently not recommended for production use.
+
+## Status
+
+WiP
+
 ### Work Done
 
 - Moved all bash and shell scripts into folder 'scripts'
@@ -31,6 +39,8 @@ https://www.pixelmed.com/dicomtoolkit.html
 
 - Run Test using maven
 - Implement build pipeline
+- Fix un-handled memory leaks e.g. on exceptions
+- Apply java best practices to the code
 - Use standard java resources structure for files like properties and CSV files
 - Identify and create maven modules for separate components
 - Run quality analysis for identifying possible improvements

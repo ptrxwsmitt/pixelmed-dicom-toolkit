@@ -12,13 +12,9 @@ import com.pixelmed.dicom.DicomInputStream;
 import com.pixelmed.dicom.StoredFilePathStrategy;
 import com.pixelmed.dicom.TagFromName;
 
-import com.pixelmed.network.ApplicationEntityMap;
 import com.pixelmed.network.DicomNetworkException;
 import com.pixelmed.network.NetworkApplicationInformationFederated;
 import com.pixelmed.network.NetworkApplicationProperties;
-import com.pixelmed.network.NetworkConfigurationFromMulticastDNS;
-import com.pixelmed.network.NetworkConfigurationFromLDAP;
-import com.pixelmed.network.NetworkConfigurationSource;
 import com.pixelmed.network.ReceivedObjectHandler;
 import com.pixelmed.network.StorageSOPClassSCPDispatcher;
 
@@ -201,7 +197,7 @@ public class DicomAndWebStorageServer {
 				properties.put(NetworkApplicationProperties.propertyName_DicomCalledAETitle,"STORESCP");
 				properties.put(NetworkApplicationProperties.propertyName_DicomCallingAETitle,"STORESCP");
 				properties.put(NetworkApplicationProperties.propertyName_PrimaryDeviceType,"ARCHIVE");
-				properties.put(DatabaseApplicationProperties.propertyName_SavedImagesFolderName,"tmp");
+				properties.put(DatabaseApplicationProperties.PROPERTY_NAME_SAVED_IMAGES_FOLDER_NAME,"tmp");
 			}
 			slf4jlogger.info("properties=\n{}",properties);	// use SLF4J since may be used as a background service
 			new DicomAndWebStorageServer(properties);

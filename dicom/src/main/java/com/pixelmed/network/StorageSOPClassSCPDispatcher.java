@@ -16,10 +16,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 
-import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
-import java.util.Arrays;
 import java.util.Properties;
 
 import com.pixelmed.slf4j.Logger;
@@ -600,7 +598,7 @@ public class StorageSOPClassSCPDispatcher implements Runnable {
 					properties.put(NetworkApplicationProperties.propertyName_DicomCalledAETitle,"STORESCP");
 					properties.put(NetworkApplicationProperties.propertyName_DicomCallingAETitle,"STORESCP");
 					properties.put(NetworkApplicationProperties.propertyName_PrimaryDeviceType,"ARCHIVE");
-					properties.put(DatabaseApplicationProperties.propertyName_SavedImagesFolderName,"tmp");
+					properties.put(DatabaseApplicationProperties.PROPERTY_NAME_SAVED_IMAGES_FOLDER_NAME,"tmp");
 				}
 				NetworkApplicationProperties networkApplicationProperties = new NetworkApplicationProperties(properties);
 //System.err.println("NetworkApplicationProperties ="+properties);
