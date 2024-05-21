@@ -15,7 +15,7 @@ https://www.pixelmed.com/dicomtoolkit.html
 
 ## Disclaimer
 
-The current state of this code is currently not recommended for production use.
+The current state of this code is not recommended for production use.
 
 ## Status
 
