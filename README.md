@@ -33,7 +33,7 @@ WiP
 - Replaced depreacted CSV Library with openCSV
 - Added codec as separate module
 - Turned dicom code into dicom module
-
+- Made Code compile, tests still failing
 
 ### Roadmap
 
