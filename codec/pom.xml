@@ -12,81 +12,10 @@
 
     <artifactId>codec</artifactId>
 
-    <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <version.slf4j>1.7.36</version.slf4j>
-        <version.junit>5.10.2</version.junit>
-    </properties>
-
     <dependencies>
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-compress</artifactId>
-            <version>1.26.1</version>
-        </dependency>
-
-        <dependency>
-            <groupId>commons-codec</groupId>
-            <artifactId>commons-codec</artifactId>
-            <version>1.17.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>commons-net</groupId>
-            <artifactId>commons-net</artifactId>
-            <version>3.10.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>javax.jmdns</groupId>
-            <artifactId>jmdns</artifactId>
-            <version>3.4.1</version>
-        </dependency>
-        <dependency>
-            <groupId>javax.vecmath</groupId>
-            <artifactId>vecmath</artifactId>
-            <version>1.5.2</version>
-        </dependency>
-
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>${version.slf4j}</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.jpedal/jpedal-lgpl -->
-        <!-- TODO requires replacement, sources and library no longer available -->
-        <!--        <dependency>-->
-        <!--            <groupId>org.jpedal</groupId>-->
-        <!--            <artifactId>jpedal-lgpl</artifactId>-->
-        <!--            <version>4.74b27</version>-->
-        <!--        </dependency>-->
-
-        <!-- data formats -->
-        <!-- https://mvnrepository.com/artifact/com.opencsv/opencsv -->
-        <dependency>
-            <groupId>com.opencsv</groupId>
-            <artifactId>opencsv</artifactId>
-            <version>5.9</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/net.sf.saxon/Saxon-HE -->
-        <dependency>
-            <groupId>net.sf.saxon</groupId>
-            <artifactId>Saxon-HE</artifactId>
-            <version>12.4</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.xmlresolver/xmlresolver -->
-        <dependency>
-            <groupId>org.xmlresolver</groupId>
-            <artifactId>xmlresolver</artifactId>
-            <version>6.0.4</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.json/json -->
-        <dependency>
-            <groupId>org.json</groupId>
-            <artifactId>json</artifactId>
-            <version>20240303</version>
         </dependency>
 
 
@@ -94,26 +23,16 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
-            <version>${version.junit}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.vintage</groupId>
             <artifactId>junit-vintage-engine</artifactId>
-            <version>${version.junit}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.hsqldb</groupId>
-            <artifactId>hsqldb</artifactId>
-            <version>2.7.2</version>
-            <!-- TODO might be used in non-test code <scope>test</scope>-->
-        </dependency>
-
-        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
-            <version>${version.slf4j}</version>
             <!-- TODO might be used in non-test code <scope>test</scope>-->
         </dependency>
     </dependencies>

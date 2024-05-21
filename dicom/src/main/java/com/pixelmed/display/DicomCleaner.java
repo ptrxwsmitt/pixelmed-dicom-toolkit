@@ -1346,7 +1346,7 @@ slf4jlogger.info("DicomCleaner.copyFromOriginalToCleanedPerformingAction(): epoc
 	protected class OurDicomImageBlackout extends DicomImageBlackout {
 	
 		OurDicomImageBlackout(String dicomFileNames[],int burnedinflag,String ourAETitle) {
-			super(dicomFileNames,(StatusNotificationHandler)null,burnedinflag);
+			super(dicomFileNames,null,burnedinflag);
 			statusNotificationHandler = new ApplicationStatusChangeEventNotificationHandler();
 			this.ourAETitle=ourAETitle;
 		}
