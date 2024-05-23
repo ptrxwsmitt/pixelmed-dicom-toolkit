@@ -17,6 +17,11 @@ https://www.pixelmed.com/dicomtoolkit.html
 
 The current state of this code is not recommended for production use.
 
+### Alternatives
+
+DCM4CHE:
+https://github.com/dcm4che/dcm4che
+
 ## Status
 
 WiP
